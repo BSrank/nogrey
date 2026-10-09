@@ -1,5 +1,41 @@
 {
-  "products": [],
+  "products": [
+    {
+      "id": "shampoo-3v1",
+      "name": "Шампоо 3в1",
+      "category": "shampoo",
+      "price": 33,
+      "priceBgn": 64.54,
+      "comparePrice": 0,
+      "comparePriceBgn": 0,
+      "imageMain": "",
+      "imagePrefix": "",
+      "previewFeatures": [
+        "Прави най добрите коси",
+        "Цветни и винаги хубави",
+        "Използвате до над 100 пъти",
+        "Бързо и лесно"
+      ],
+      "sections": [
+        {
+          "title": "Как се използва",
+          "items": [
+            "Без амониак",
+            "мажете и се чуствате",
+            "след като намажите",
+            "гледайте косата",
+            "изкъпете я"
+          ]
+        },
+        {
+          "title": "Съставки",
+          "items": []
+        }
+      ],
+      "active": true,
+      "isNewListing": true
+    }
+  ],
   "settings": {
     "storeName": "NoGrey",
     "siteDomain": "nogrey.store",
