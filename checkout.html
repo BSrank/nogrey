@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Поръчка — NoGrey</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="container" id="root"><div class="spinner" style="margin:80px auto"></div></main>
+<div id="site-footer"></div>
+<script src="assets/cart.js"></script>
+<script>
+(async function () {
+  await initPage('');
+  const root = document.getElementById('root');
+  let promo = null; // {code, type, percent}
+
+  function totals() {
+    const t = cartTotals();
+    const pct = promo && promo.type === 'discount' ? Number(promo.percent) || 0 : 0;
+    const discEur = Math.round(t.eur * pct) / 100;
+    const discBgn = Math.round(t.bgn * pct) / 100;
+    return { ...t, pct, discEur, discBgn, finalEur: t.eur - discEur, finalBgn: t.bgn - discBgn };
+  }
+
+  function renderSummary() {
+    const t = totals();
+    document.getElementById('summary-lines').innerHTML = t.lines.map(l => `
+      <div class="line-item" style="grid-template-columns:56px 1fr auto">
+        ${imgTag(mainImage(l.p), l.p.name)}
+        <div><div class="name">${esc(l.p.name)}</div><div class="muted" style="font-size:.85rem">${l.qty} × ${eur(l.p.price)}</div></div>
+        <div style="font-weight:700">${eur(l.eur)}</div>
+      </div>`).join('');
+    document.getElementById('summary-totals').innerHTML = `
+      <div><span>Междинна сума</span><span>${eur(t.eur)}</span></div>
+      ${t.pct ? `<div style="color:var(--green-2)"><span>Отстъпка ${t.pct}% (${esc(promo.code)})</span><span>−${eur(t.discEur)}</span></div>` : ''}
+      ${promo && promo.type === 'gift' ? `<div style="color:var(--green-2)"><span>Подарък (${esc(promo.code)})</span><span>включен</span></div>` : ''}
+      <div class="muted" style="font-size:.88rem"><span>Доставка</span><span>${Number(STORE.settings.freeShippingThreshold) > 0 && t.eur >= Number(STORE.settings.freeShippingThreshold) ? 'Безплатна' : 'по тарифа на Econt'}</span></div>
+      <div class="grand"><span>Общо</span><span>${eur(t.finalEur)}</span></div>
+      <div class="muted" style="text-align:right;font-size:.88rem">${bgn(t.finalBgn)}</div>`;
+  }
+
+  if (!cartTotals().lines.length) {
+    root.innerHTML = '<div class="empty-state" style="padding:80px 0"><h2>Количката е празна</h2><a class="btn" href="products.html">Към продуктите</a></div>';
+    return;
+  }
+
+  root.innerHTML = `
+    <div class="checkout">
+      <form id="order-form" class="card" novalidate>
+        <h2 style="font-size:1.6rem">Данни за доставка</h2>
+        <div class="row2">
+          <div class="field"><label for="f-name">Име и фамилия *</label><input id="f-name" autocomplete="name" required></div>
+          <div class="field"><label for="f-phone">Телефон *</label><input id="f-phone" type="tel" autocomplete="tel" placeholder="08XX XXX XXX" required></div>
+        </div>
+        <div class="field"><label for="f-email">Имейл (по желание)</label><input id="f-email" type="email" autocomplete="email"><small>За потвърждение на поръчката и линк за отказ.</small></div>
+        <div class="row2">
+          <div class="field"><label for="f-courier">Куриер</label><select id="f-courier"><option value="Econt">Econt</option></select></div>
+          <div class="field"><label for="f-city">Град *</label><input id="f-city" autocomplete="address-level2" required></div>
+        </div>
+        <div class="field"><label for="f-office">Офис на Econt *</label><input id="f-office" placeholder="напр. Econt – София, ж.к. Младост 1" required></div>
+        <div class="field"><label for="f-note">Бележка (по желание)</label><textarea id="f-note" rows="2"></textarea></div>
+        <div class="field">
+          <label for="f-promo">Промо код</label>
+          <div class="promo-row"><input id="f-promo" style="text-transform:uppercase"><button type="button" class="btn ghost" id="promo-btn">Приложи</button></div>
+          <div id="promo-status" style="margin-top:8px;font-size:.9rem"></div>
+        </div>
+        <div class="notice" style="margin-bottom:16px"><strong>Плащане:</strong> наложен платеж — плащате в брой на куриера при получаване.</div>
+        <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="checkbox" id="f-terms" style="width:auto;margin-top:5px"> <span>Съгласен/на съм с <a href="terms.html" target="_blank">условията за ползване и наложения платеж</a>.</span></label>
+        <div id="form-status" style="margin:14px 0"></div>
+        <button class="btn block" type="submit" id="submit-btn">Потвърди поръчката</button>
+      </form>
+      <aside class="card summary">
+        <h3>Твоята поръчка</h3>
+        <div id="summary-lines"></div>
+        <div class="totals" id="summary-totals" style="margin-top:14px"></div>
+      </aside>
+    </div>`;
+  renderSummary();
+
+  document.getElementById('promo-btn').onclick = async () => {
+    const code = document.getElementById('f-promo').value.trim().toUpperCase();
+    const st = document.getElementById('promo-status');
+    if (!code) { promo = null; st.textContent = ''; renderSummary(); return; }
+    st.textContent = 'Проверка…';
+    try {
+      const res = await apiGet({ action: 'validatePromo', code });
+      if (res.ok && res.valid) {
+        promo = { code, type: res.type, percent: res.percent };
+        st.innerHTML = res.type === 'gift' ? '<span style="color:var(--green-2)">✓ Кодът е валиден — ще получите подарък към поръчката.</span>' : `<span style="color:var(--green-2)">✓ Отстъпка ${res.percent}% е приложена.</span>`;
+      } else {
+        promo = null;
+        st.innerHTML = `<span style="color:var(--danger)">${esc(res.error || 'Невалиден или вече използван код.')}</span>`;
+      }
+    } catch (e) { promo = null; st.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+    renderSummary();
+  };
+
+  document.getElementById('order-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const st = document.getElementById('form-status');
+    const v = id => document.getElementById(id).value.trim();
+    const phone = v('f-phone').replace(/[^\d+]/g, '');
+    const errs = [];
+    if (v('f-name').length < 3) errs.push('Въведете име и фамилия.');
+    if (!/^(\+?359|0)8\d{8}$/.test(phone)) errs.push('Въведете валиден български мобилен номер.');
+    if (v('f-email') && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('f-email'))) errs.push('Имейлът не е валиден.');
+    if (!v('f-city')) errs.push('Въведете град.');
+    if (!v('f-office')) errs.push('Въведете офис на Econt.');
+    if (!document.getElementById('f-terms').checked) errs.push('Трябва да приемете условията.');
+    if (errs.length) { st.innerHTML = `<div class="notice error">${errs.join('<br>')}</div>`; return; }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true; btn.textContent = 'Изпращане…'; st.innerHTML = '';
+    const t = totals();
+    try {
+      const res = await apiPost({
+        action: 'placeOrder',
+        customer: { name: v('f-name'), phone, email: v('f-email'), courier: v('f-courier'), city: v('f-city'), office: v('f-office'), note: v('f-note') },
+        items: t.lines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: Number(l.p.price), priceBgn: productBgn(l.p) })),
+        promoCode: promo ? promo.code : ''
+      });
+      if (!res.ok) throw new Error(res.error || 'Поръчката не беше изпратена.');
+      saveCart([]);
+      root.innerHTML = `
+        <div class="prose" style="text-align:center">
+          <div class="icon-dot" style="margin:0 auto 18px;width:64px;height:64px;font-size:1.6rem">✓</div>
+          <h1 style="font-size:2.2rem">Благодарим за поръчката!</h1>
+          <p>Номер на поръчката: <strong>${esc(res.orderId)}</strong></p>
+          <p class="muted">Ще се свържем с вас по телефона за потвърждение. Пратката ще пристигне в избрания офис на Econt, а плащането е при получаване.${v('f-email') ? ' Изпратихме ви и потвърждение по имейл.' : ''}</p>
+          ${res.promoWarning ? `<div class="notice error">${esc(res.promoWarning)}</div>` : ''}
+          <a class="btn" href="index.html" style="margin-top:16px">Към началото</a>
+        </div>`;
+      window.scrollTo(0, 0);
+    } catch (err) {
+      st.innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
+      btn.disabled = false; btn.textContent = 'Потвърди поръчката';
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оставете ревю — NoGrey</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="prose" id="root"><div class="spinner"></div></main>
+<div id="site-footer"></div>
+<script src="assets/cart.js"></script>
+<script>
+(async function () {
+  await initPage('');
+  const root = document.getElementById('root');
+  const token = qs('t') || qs('token');
+  const fail = msg => { root.innerHTML = `<h1 style="font-size:2rem">Оставете ревю</h1><div class="notice error">${esc(msg)}</div>`; };
+  if (!token) return fail('Ревюта могат да се оставят само чрез личния линк от имейла с поканата.');
+  let info;
+  try {
+    info = await apiGet({ action: 'validateReviewToken', token });
+    if (!info.ok) return fail(info.error || 'Линкът е невалиден или вече е използван.');
+  } catch (e) { return fail(e.message); }
+
+  let rating = 5;
+  root.innerHTML = `
+    <div class="eyebrow">Поръчка ${esc(info.orderId)}</div>
+    <h1 style="font-size:2.1rem">Как ви се стори продуктът?</h1>
+    <p class="muted">Благодарим, ${esc(info.name)}! След като одобрим ревюто ви, ще получите по имейл награда — промо код за отстъпка или подарък за следващата поръчка.</p>
+    <form class="card" id="rf" style="margin-top:20px">
+      <div class="field"><label>Оценка</label><div class="star-input" id="stars">${[1,2,3,4,5].map(n => `<button type="button" data-n="${n}" aria-label="${n} звезди">★</button>`).join('')}</div></div>
+      <div class="field"><label for="r-name">Име, което да се показва</label><input id="r-name" value="${esc((info.name || '').split(' ')[0])}" required></div>
+      <div class="field"><label for="r-text">Вашето мнение</label><textarea id="r-text" rows="5" required placeholder="Колко бързо видяхте резултат? Как изглежда цветът?"></textarea></div>
+      <button class="btn block" type="submit">Изпрати ревюто</button>
+      <div id="st" style="margin-top:12px"></div>
+    </form>`;
+  const paint = () => document.querySelectorAll('#stars button').forEach(b => b.classList.toggle('on', Number(b.dataset.n) <= rating));
+  paint();
+  document.getElementById('stars').onclick = e => { const b = e.target.closest('button'); if (b) { rating = Number(b.dataset.n); paint(); } };
+  document.getElementById('rf').addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = document.getElementById('r-text').value.trim();
+    const st = document.getElementById('st');
+    if (text.length < 10) { st.innerHTML = '<div class="notice error">Моля, напишете поне няколко думи.</div>'; return; }
+    const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const r = await apiPost({ action: 'submitReview', token, rating, name: document.getElementById('r-name').value.trim(), text });
+      if (!r.ok) throw new Error(r.error || 'Грешка при изпращане.');
+      root.innerHTML = '<h1 style="font-size:2rem">Благодарим!</h1><div class="notice ok">Ревюто ви е получено. След одобрение ще ви изпратим наградата по имейл.</div><p style="margin-top:20px"><a href="index.html">Към началото</a></p>';
+    } catch (err) { st.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; btn.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

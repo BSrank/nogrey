@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Отказ на поръчка — NoGrey</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="prose" id="root"><div class="spinner"></div></main>
+<div id="site-footer"></div>
+<script src="assets/cart.js"></script>
+<script>
+(async function () {
+  await initPage('');
+  const root = document.getElementById('root');
+  const token = qs('t') || qs('token');
+  const fail = msg => { root.innerHTML = `<h1 style="font-size:2rem">Отказ на поръчка</h1><div class="notice error">${esc(msg)}</div><p style="margin-top:20px"><a href="index.html">Към началото</a></p>`; };
+  if (!token) return fail('Липсва линк за отказ. Използвайте линка от имейла с потвърждението.');
+  try {
+    const res = await apiGet({ action: 'getCancelInfo', token });
+    if (!res.ok) return fail(res.error || 'Линкът е невалиден.');
+    const o = res.order;
+    if (o.status !== 'Нова') {
+      root.innerHTML = `<h1 style="font-size:2rem">Поръчка ${esc(o.orderId)}</h1><div class="notice">Тази поръчка вече е със статус „${esc(o.status)}“ и не може да бъде отказана онлайн. При въпроси се свържете с нас.</div>`;
+      return;
+    }
+    root.innerHTML = `
+      <h1 style="font-size:2rem">Отказ на поръчка ${esc(o.orderId)}</h1>
+      <div class="card" style="margin:20px 0">
+        <p><strong>Дата:</strong> ${esc(o.date)}</p>
+        <p><strong>Продукти:</strong><br>${esc(o.items).replace(/\n/g, '<br>')}</p>
+        <p style="margin:0"><strong>Сума:</strong> ${esc(o.total)}</p>
+      </div>
+      <p>Сигурни ли сте, че искате да откажете поръчката? Действието не може да бъде отменено.</p>
+      <button class="btn" id="go" style="background:var(--danger);border-color:var(--danger)">Да, откажи поръчката</button>
+      <a class="btn ghost" href="index.html" style="margin-left:8px">Не, запази я</a>
+      <div id="st" style="margin-top:16px"></div>`;
+    document.getElementById('go').onclick = async ev => {
+      ev.target.disabled = true;
+      try {
+        const r = await apiPost({ action: 'cancelOrder', token });
+        if (!r.ok) throw new Error(r.error || 'Неуспешен отказ.');
+        root.innerHTML = `<h1 style="font-size:2rem">Поръчката е отказана</h1><div class="notice ok">Поръчка ${esc(o.orderId)} беше отказана успешно. Изпратихме ви потвърждение по имейл.</div><p style="margin-top:20px"><a href="index.html">Към началото</a></p>`;
+      } catch (e) {
+        document.getElementById('st').innerHTML = `<div class="notice error">${esc(e.message)}</div>`;
+        ev.target.disabled = false;
+      }
+    };
+  } catch (e) { fail(e.message); }
+})();
+</script>
+</body>
+</html>

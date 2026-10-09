@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Продукти — NoGrey</title>
+<meta name="description" content="Всички оцветяващи шампоани и серуми против бяла коса и брада на NoGrey.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+
+<section class="section" style="padding-top:44px">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Магазин</div>
+      <h1 style="font-size:clamp(1.9rem,4vw,2.6rem)">Всички продукти</h1>
+      <p class="muted">Оцветяващи шампоани за коса и брада и серуми за грижа от корена.</p>
+    </div>
+    <div class="filters" id="filters">
+      <button class="chip" data-cat="">Всички</button>
+      <button class="chip" data-cat="shampoo">Шампоани</button>
+      <button class="chip" data-cat="serum">Серуми</button>
+      <button class="chip" data-cat="set">Комплекти</button>
+    </div>
+    <div class="products-grid" id="grid"><div class="spinner"></div></div>
+  </div>
+</section>
+
+<div id="site-footer"></div>
+<script src="assets/cart.js"></script>
+<script>
+(async function () {
+  await initPage('products');
+  const all = activeProducts();
+  // Показваме само филтрите, за които има продукти
+  document.querySelectorAll('#filters .chip').forEach(b => {
+    if (b.dataset.cat && !all.some(p => p.category === b.dataset.cat)) b.style.display = 'none';
+  });
+  let cat = qs('cat') || '';
+  function render() {
+    document.querySelectorAll('#filters .chip').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+    const list = all.filter(p => !cat || p.category === cat);
+    document.getElementById('grid').innerHTML = list.length
+      ? list.map(productCard).join('')
+      : '<div class="empty-state" style="grid-column:1/-1">Няма продукти в тази категория.</div>';
+  }
+  document.getElementById('filters').addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    cat = b.dataset.cat;
+    history.replaceState(null, '', cat ? '?cat=' + cat : 'products.html');
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
