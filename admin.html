@@ -54,6 +54,17 @@
   @media (max-width: 860px) { .settings-grid { grid-template-columns: 1fr; } }
   .card h3 { margin-bottom: 14px; }
   .hero-prev { width: 100%; aspect-ratio: 16/7; border-radius: 10px; background: var(--sage) center/cover no-repeat; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); font-size: .9rem; margin-bottom: 12px; }
+  .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .img-slot { position: relative; border: 1px solid var(--line); border-radius: 10px; background: #fafbfa; overflow: hidden; display: flex; flex-direction: column; margin: 0; font-weight: 400; }
+  .img-slot img, .img-empty { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--sage); display: block; }
+  .img-empty { display: grid; place-items: center; color: var(--muted); font-size: .8rem; }
+  .img-slot.main { border: 2px solid var(--green); }
+  .img-label { position: absolute; top: 6px; left: 6px; background: rgba(20,53,40,.85); color: #fff; font-size: .72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+  .img-slot.new .img-label::after { content: " · нова"; font-weight: 600; }
+  .img-acts { display: flex; gap: 4px; padding: 6px; justify-content: center; flex-wrap: wrap; }
+  .img-acts .btn { padding: 4px 9px; font-size: .78rem; margin: 0; }
+  .img-slot.add { min-height: 140px; display: grid; place-items: center; align-content: center; border: 2px dashed var(--sage-2); cursor: pointer; color: var(--green); font-weight: 700; text-align: center; padding: 10px; font-size: .88rem; }
+  .img-slot.add:hover { background: var(--sage); }
   .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
   code { background: var(--sage); padding: 2px 6px; border-radius: 4px; font-size: .85em; word-break: break-all; }
 </style>
@@ -94,7 +105,7 @@
         <button class="btn ghost sm" onclick="queueGitHubSave('Ръчно запазване')">Запази products.json</button>
         <button class="btn sm" onclick="editProduct(null)">+ Нов продукт</button>
       </div>
-      <div class="notice" style="margin-bottom:16px;font-size:.88rem">Снимките се качват ръчно в repo-то. За всеки продукт попълни <b>Главна снимка</b> (напр. <code>images/shampoo-black/main.jpg</code>) и <b>Префикс</b> (напр. <code>images/shampoo-black/photo</code> → сайтът търси <code>photo.1.jpg</code>, <code>photo.2.jpg</code>… до 12).</div>
+      <div class="notice" style="margin-bottom:16px;font-size:.88rem">Снимките се качват от „Редактирай“ → <b>Снимки</b>: главна + до 12 допълнителни. Появяват се на сайта до ~1 минута след запазване.</div>
       <div id="prod-list"></div>
     </section>
 
@@ -285,11 +296,13 @@ function queueGitHubSave(message) {
   setSaveState('Запазване…');
   saveChain = saveChain.then(() => saveProductsJson(message || 'Обновяване от админ панела')).then(() => {
     setSaveState('Запазено ✓ ' + new Date().toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' }));
+    return true;
   }).catch(err => {
     setSaveState('Грешка при запазване!');
     alert('Неуспешно запазване: ' + err.message);
+    return false;
   });
-  return saveChain;
+  return saveChain; // резолвва с true/false
 }
 async function saveProductsJson(message) {
   const content = b64EncodeUtf8(JSON.stringify(DATA, null, 2) + '\n');
@@ -305,6 +318,56 @@ async function uploadImageToGithub(file, path) {
   const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); });
   await ghPutFile(path, dataUrl.split(',')[1], 'Качване на ' + path);
   return dataUrl;
+}
+// Запис с един повторен опит при 409 (GitHub отказва паралелни commit-и в един бранч)
+async function ghPutRetry(path, b64, message) {
+  try { return await ghPutFile(path, b64, message); }
+  catch (err) {
+    if (err.status === 409 || err.status === 422) { await new Promise(r => setTimeout(r, 1200)); return ghPutFile(path, b64, message); }
+    throw err;
+  }
+}
+async function ghDeleteFile(path, message) {
+  const f = await ghGetFile(path);
+  if (!f || !f.sha) return;
+  const r = await fetch(ghUrl(path), { method: 'DELETE', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ message, sha: f.sha }) });
+  if (!r.ok) throw new Error('GitHub грешка ' + r.status);
+}
+function blobToB64(blob) {
+  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = rej; fr.readAsDataURL(blob); });
+}
+// Чете съществуваща снимка от repo-то като base64 (за преподреждане/копиране)
+async function fetchRepoB64(path) {
+  let src = String(path).split('?')[0];
+  if (!/^(https?:|data:)/.test(src)) {
+    const f = await ghGetFile(src);
+    if (!f) throw new Error('Липсва файл ' + src);
+    if (f.content && f.content.trim()) return f.content.replace(/\s/g, '');
+    src = f.download_url; // файлове над 1 MB идват без content
+  }
+  const r = await fetch(src);
+  if (!r.ok) throw new Error('Не мога да прочета ' + path);
+  return blobToB64(await r.blob());
+}
+// Преоразмерява до 1600px и конвертира в JPG (галерията на сайта търси само .jpg)
+async function fileToJpeg(file, max = 1600, quality = 0.85) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error(`Форматът на „${file.name}“ не се поддържа от браузъра. Запази я като JPG или PNG.`));
+      i.src = url;
+    });
+    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); // прозрачен PNG → бял фон
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const dataUrl = c.toDataURL('image/jpeg', quality);
+    return { url: dataUrl, b64: dataUrl.split(',')[1] };
+  } finally { URL.revokeObjectURL(url); }
 }
 function rawUrl(path) {
   if (!path) return '';
@@ -428,9 +491,16 @@ function editProduct(i) {
         <div class="field"><label>Стара цена € (зачертана)</label><input id="p-comparePrice" type="number" step="0.01" min="0" value="${esc(p.comparePrice)}"></div>
         <div class="field"><label>Стара цена лв.</label><input id="p-comparePriceBgn" type="number" step="0.01" min="0" value="${esc(p.comparePriceBgn)}" placeholder="авто"></div>
       </div>
-      <div class="field"><label>Главна снимка (път в repo-то)</label><input id="p-imageMain" value="${esc(p.imageMain)}" placeholder="images/shampoo-black/main.jpg"></div>
-      <div class="field"><label>Префикс на снимките</label><input id="p-imagePrefix" value="${esc(p.imagePrefix)}" placeholder="images/shampoo-black/photo"><small>Сайтът търси {префикс}.1.jpg, {префикс}.2.jpg … до 12; спира след 2 липсващи поред.</small></div>
-      <div id="img-prev" style="display:flex;gap:8px;margin-bottom:14px"></div>
+      <div class="field">
+        <label>Снимки</label>
+        <div id="img-editor"></div>
+        <small>Първата (Главна) се показва в списъка с продукти. Снимките се преоразмеряват автоматично и се качват в GitHub при „Запази продукта“.</small>
+      </div>
+      <details style="margin-bottom:16px">
+        <summary class="muted" style="cursor:pointer;font-size:.88rem">Ръчни пътища (по желание)</summary>
+        <div class="field" style="margin-top:10px"><label>Главна снимка (път в repo-то)</label><input id="p-imageMain" value="${esc(p.imageMain)}" placeholder="images/shampoo-black/main.jpg"></div>
+        <div class="field"><label>Префикс на снимките</label><input id="p-imagePrefix" value="${esc(p.imagePrefix)}" placeholder="images/shampoo-black/photo"><small>Сайтът търси {префикс}.1.jpg, {префикс}.2.jpg … до 12. Попълват се автоматично при качване.</small></div>
+      </details>
       <div class="field"><label>Кратки предимства (по едно на ред)</label><textarea id="p-feats" rows="4" placeholder="Покрива бялото за 5 измивания&#10;За коса и брада">${esc((p.previewFeatures || []).join('\n'))}</textarea></div>
       <div class="field"><label>Секции (акордеон на продуктовата страница)</label><div id="p-sections"></div><button type="button" class="btn ghost sm" onclick="addSection()">+ Секция</button></div>
       <div style="display:flex;gap:18px;margin:8px 0 20px;flex-wrap:wrap">
@@ -441,13 +511,148 @@ function editProduct(i) {
     </form>`;
   const secBox = document.getElementById('p-sections');
   (p.sections || []).forEach(s => secBox.appendChild(sectionEl(s)));
-  const prev = () => {
-    const m = document.getElementById('p-imageMain').value.trim();
-    document.getElementById('img-prev').innerHTML = m ? `<img src="${esc(rawUrl(m))}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;background:var(--sage)" onerror="this.replaceWith(Object.assign(document.createElement('small'),{textContent:'Снимката не е намерена в repo-то',style:'color:var(--danger)'}))">` : '';
-  };
-  document.getElementById('p-imageMain').addEventListener('change', prev); prev();
+  loadImgEditor(p.imageMain, p.imagePrefix);
+  // При ръчна промяна на пътищата — презареди прегледа (ако няма незапазени качвания)
+  ['p-imageMain', 'p-imagePrefix'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+    if (IMG && (IMG.mainDirty || IMG.galDirty)) return;
+    loadImgEditor(document.getElementById('p-imageMain').value.trim(), document.getElementById('p-imagePrefix').value.trim());
+  }));
   document.getElementById('pf').addEventListener('submit', submitProduct);
   document.getElementById('modal').classList.add('open');
+}
+
+/* ======= Снимки на продукта (качване от админа) ======= */
+const MAX_PHOTOS = 12;
+let IMG = null;          // { main, gallery[], mainDirty, galDirty, origMain, origPrefix, origGallery[] }
+let SAVING_PRODUCT = false;
+
+async function loadImgEditor(imageMain, imagePrefix) {
+  IMG = null; renderImgEditor();
+  const main = imageMain ? { path: imageMain, url: rawUrl(imageMain) } : null;
+  const gallery = [];
+  const prefix = (imagePrefix || '').trim();
+  if (prefix) {
+    const paths = Array.from({ length: MAX_PHOTOS }, (_, i) => `${prefix}.${i + 1}.jpg`);
+    const ok = await Promise.all(paths.map(x => checkImageExists(rawUrl(x))));
+    let miss = 0;
+    for (let i = 0; i < paths.length; i++) {
+      if (ok[i]) { gallery.push({ path: paths[i], url: rawUrl(paths[i]) }); miss = 0; }
+      else if (++miss >= 2) break;
+    }
+  }
+  IMG = { main, gallery, mainDirty: false, galDirty: false, origMain: imageMain || '', origPrefix: prefix, origGallery: gallery.map(g => g.path) };
+  renderImgEditor();
+}
+
+function renderImgEditor(status) {
+  const box = document.getElementById('img-editor');
+  if (!box) return;
+  if (!IMG) { box.innerHTML = '<div class="spinner" style="margin:12px auto"></div>'; return; }
+  const n = IMG.gallery.length;
+  box.innerHTML = `
+    <div class="img-grid">
+      <div class="img-slot main ${IMG.main && IMG.main.b64 ? 'new' : ''}">
+        ${IMG.main ? `<img src="${esc(IMG.main.url)}" alt="" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">` : '<div class="img-empty">Няма главна</div>'}
+        <span class="img-label">Главна</span>
+        <div class="img-acts">
+          <label class="btn ${IMG.main ? 'ghost' : ''} sm">${IMG.main ? 'Смени' : 'Качи'}<input type="file" accept="image/*" hidden onchange="pickMain(this)"></label>
+          ${IMG.main ? '<button type="button" class="btn danger ghost sm" onclick="removeMain()" title="Махни">×</button>' : ''}
+        </div>
+      </div>
+      ${IMG.gallery.map((g, k) => `
+        <div class="img-slot ${g.b64 ? 'new' : ''}">
+          <img src="${esc(g.url)}" alt="" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
+          <span class="img-label">${k + 1}</span>
+          <div class="img-acts">
+            <button type="button" class="btn ghost sm" onclick="moveImg(${k},-1)" ${k === 0 ? 'disabled' : ''} title="Наляво">←</button>
+            <button type="button" class="btn ghost sm" onclick="moveImg(${k},1)" ${k === n - 1 ? 'disabled' : ''} title="Надясно">→</button>
+            <button type="button" class="btn ghost sm" onclick="makeMain(${k})" title="Направи главна">★</button>
+            <button type="button" class="btn danger ghost sm" onclick="removeImg(${k})" title="Махни">×</button>
+          </div>
+        </div>`).join('')}
+      ${n < MAX_PHOTOS ? `<label class="img-slot add">+ Добави снимки<br><small class="muted">(още ${MAX_PHOTOS - n}, може няколко наведнъж)</small><input type="file" accept="image/*" multiple hidden onchange="pickGallery(this)"></label>` : ''}
+    </div>
+    ${(IMG.mainDirty || IMG.galDirty) ? '<p style="font-size:.85rem;color:var(--warn);margin:8px 0 0">Има незапазени промени по снимките — натисни „Запази продукта“.</p>' : ''}
+    ${status ? `<div class="notice error" style="margin-top:8px">${esc(status)}</div>` : ''}`;
+}
+
+async function pickMain(input) {
+  const file = input.files[0]; input.value = '';
+  if (!file) return;
+  try {
+    const j = await fileToJpeg(file);
+    IMG.main = { url: j.url, b64: j.b64 };
+    IMG.mainDirty = true;
+    renderImgEditor();
+  } catch (e) { renderImgEditor(e.message); }
+}
+function removeMain() {
+  if (!confirm('Да махна главната снимка?')) return;
+  IMG.main = null; IMG.mainDirty = true; renderImgEditor();
+}
+async function pickGallery(input) {
+  const files = [...input.files]; input.value = '';
+  const room = MAX_PHOTOS - IMG.gallery.length;
+  const errs = [];
+  if (files.length > room) errs.push(`Максимумът е ${MAX_PHOTOS} снимки — добавени са първите ${room}.`);
+  for (const f of files.slice(0, room)) {
+    try { const j = await fileToJpeg(f); IMG.gallery.push({ url: j.url, b64: j.b64 }); IMG.galDirty = true; }
+    catch (e) { errs.push(e.message); }
+  }
+  renderImgEditor(errs.join(' '));
+}
+function moveImg(k, d) {
+  const j = k + d; if (j < 0 || j >= IMG.gallery.length) return;
+  [IMG.gallery[k], IMG.gallery[j]] = [IMG.gallery[j], IMG.gallery[k]];
+  IMG.galDirty = true; renderImgEditor();
+}
+function removeImg(k) {
+  IMG.gallery.splice(k, 1); IMG.galDirty = true; renderImgEditor();
+}
+function makeMain(k) {
+  const g = IMG.gallery[k];
+  if (IMG.main) IMG.gallery[k] = IMG.main; else IMG.gallery.splice(k, 1);
+  IMG.main = g;
+  IMG.mainDirty = true; IMG.galDirty = true; renderImgEditor();
+}
+// Трием само файлове, създадени от админа (main-xxx.jpg / gxxx.N.jpg) — никога ръчно качени
+function isManagedImage(path) { return /\/(main-[a-z0-9]+\.jpg|g[a-z0-9]+\.\d+\.jpg)$/.test(String(path).split('?')[0]); }
+function folderOf(path) { const m = String(path || '').split('?')[0].match(/^(images\/[^/]+)\//); return m ? m[1] : ''; }
+
+// Качва променените снимки; връща { imageMain, imagePrefix, toDelete[] }
+async function uploadProductImages(id, name, setProgress) {
+  const res = { imageMain: null, imagePrefix: null, toDelete: [] };
+  const folder = folderOf(IMG.origPrefix) || folderOf(IMG.origMain) || `images/${id}`;
+  const ts = Date.now().toString(36);
+  const total = (IMG.mainDirty && IMG.main ? 1 : 0) + (IMG.galDirty ? IMG.gallery.length : 0);
+  let done = 0;
+  const step = () => setProgress(`Качване на снимки ${++done}/${total}…`);
+
+  // Първо прочитаме всичко, после пишем (за да не презапишем файл, който още ни трябва)
+  const mainB64 = IMG.mainDirty && IMG.main ? (IMG.main.b64 || await fetchRepoB64(IMG.main.path)) : null;
+  const galB64 = [];
+  if (IMG.galDirty) for (const g of IMG.gallery) galB64.push(g.b64 || await fetchRepoB64(g.path));
+
+  if (IMG.mainDirty) {
+    if (mainB64) {
+      step();
+      const path = `${folder}/main-${ts}.jpg`;
+      await ghPutRetry(path, mainB64, 'Главна снимка: ' + name);
+      res.imageMain = path;
+    } else res.imageMain = '';
+    if (IMG.origMain && isManagedImage(IMG.origMain)) res.toDelete.push(IMG.origMain.split('?')[0]);
+  }
+  if (IMG.galDirty) {
+    // Нов префикс при всяка промяна → няма стари кеширани снимки и няма „дупки“ в номерацията
+    const prefix = `${folder}/g${ts}`;
+    for (let k = 0; k < galB64.length; k++) {
+      step();
+      await ghPutRetry(`${prefix}.${k + 1}.jpg`, galB64[k], `Снимка ${k + 1}: ${name}`);
+    }
+    res.imagePrefix = galB64.length ? prefix : '';
+    IMG.origGallery.filter(isManagedImage).forEach(x => res.toDelete.push(x));
+  }
+  return res;
 }
 function sectionEl(s) {
   const d = document.createElement('div');
@@ -457,10 +662,15 @@ function sectionEl(s) {
   return d;
 }
 function addSection() { document.getElementById('p-sections').appendChild(sectionEl({ title: '', items: [] })); }
-function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function closeModal(force) {
+  if (SAVING_PRODUCT && !force) return;
+  if (!force && IMG && (IMG.mainDirty || IMG.galDirty) && !confirm('Има незапазени снимки. Да затворя ли без запазване?')) return;
+  document.getElementById('modal').classList.remove('open');
+}
 
-function submitProduct(e) {
+async function submitProduct(e) {
   e.preventDefault();
+  if (SAVING_PRODUCT) return;
   const v = id => document.getElementById(id).value.trim();
   const n = id => { const x = parseFloat(v(id)); return isNaN(x) ? 0 : Math.round(x * 100) / 100; };
   const name = v('p-name');
@@ -485,12 +695,37 @@ function submitProduct(e) {
     active: document.getElementById('p-active').checked,
     isNewListing: document.getElementById('p-new').checked
   };
-  if (EDIT_INDEX === null) DATA.products.push(p); else DATA.products[EDIT_INDEX] = p;
+  const editIndex = EDIT_INDEX;
+  let toDelete = [];
+  if (IMG && (IMG.mainDirty || IMG.galDirty)) {
+    const btn = document.querySelector('#pf button[type=submit]');
+    SAVING_PRODUCT = true; btn.disabled = true;
+    try {
+      await saveChain; // изчакваме предишни запазвания — GitHub не обича паралелни commit-и
+      const r = await uploadProductImages(id, name, t => { btn.textContent = t; });
+      if (r.imageMain !== null) p.imageMain = r.imageMain;
+      if (r.imagePrefix !== null) p.imagePrefix = r.imagePrefix;
+      toDelete = r.toDelete;
+    } catch (err) {
+      SAVING_PRODUCT = false; btn.disabled = false; btn.textContent = 'Запази продукта';
+      renderImgEditor('Грешка при качване: ' + err.message + ' — опитай пак.');
+      return;
+    }
+    SAVING_PRODUCT = false;
+  }
+  if (editIndex === null) DATA.products.push(p); else DATA.products[editIndex] = p;
   if (oldId && oldId !== id) delete DATA.urgency.items[oldId];
   const u = parseInt(v('p-urgency'), 10);
   if (u > 0) DATA.urgency.items[id] = u; else delete DATA.urgency.items[id];
-  closeModal(); renderProducts();
-  queueGitHubSave((EDIT_INDEX === null ? 'Нов продукт: ' : 'Редакция: ') + name);
+  closeModal(true); renderProducts();
+  const ok = await queueGitHubSave((editIndex === null ? 'Нов продукт: ' : 'Редакция: ') + name);
+  // Старите снимки се трият чак след като products.json вече сочи към новите
+  if (ok && toDelete.length) {
+    saveChain = saveChain.then(async () => {
+      for (const x of toDelete) { try { await ghDeleteFile(x, 'Премахната стара снимка'); } catch (err) { /* не е критично */ } }
+      return true;
+    });
+  }
 }
 
 /* ======= Поръчки ======= */
