@@ -2,7 +2,7 @@
 
 // ⚠️ След деплой на Code.gs като Web App — постави тук URL-а му.
 const GOOGLE_SHEETS_CONFIG = {
-  webAppUrl: 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbzAUcHOQeCXiD2RN-rs_gBvEgd98FdhX_hRVntlcZBRkxhb8MK5JYPmjJsbb-y6ys4C/exec'
 };
 
 const BGN_RATE = 1.95583;
