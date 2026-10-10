@@ -2,7 +2,7 @@
 
 // ⚠️ След деплой на Code.gs като Web App — постави тук URL-а му.
 const GOOGLE_SHEETS_CONFIG = {
-  webAppUrl: 'https://script.google.com/macros/s/AKfycbzAUcHOQeCXiD2RN-rs_gBvEgd98FdhX_hRVntlcZBRkxhb8MK5JYPmjJsbb-y6ys4C/exec'
+  webAppUrl: 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'
 };
 
 const BGN_RATE = 1.95583;
@@ -284,13 +284,55 @@ function productCard(p) {
 
 /* ---------- Ревюта ---------- */
 function starStr(n) { n = Math.max(0, Math.min(5, Number(n) || 5)); return '★'.repeat(n) + '☆'.repeat(5 - n); }
+// Снимка от Google Drive (клиентски ревюта) — публичен thumbnail линк
+function driveImg(id, w) { return `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w || 1200}`; }
+
+// r: {text, author|name, rating, courier?, verified?, photos?: [url]}
 function reviewCard(r) {
+  const photos = (r.photos || []).filter(Boolean);
+  const meta = r.verified ? 'Потвърден купувач' : (r.courier ? 'Доставено с ' + esc(r.courier) : '');
   return `<div class="review">
     <div class="stars">${starStr(r.rating || 5)}</div>
     <p style="margin:10px 0 0">${esc(r.text)}</p>
+    ${photos.length ? `<div class="review-photos">${photos.map(src => `<button type="button" onclick="openLightbox('${esc(src)}')" aria-label="Увеличи снимката"><img src="${esc(src)}" alt="Снимка от клиент" loading="lazy" onerror="this.closest('button').remove()"></button>`).join('')}</div>` : ''}
     <div class="who">${esc(r.author || r.name || 'Клиент')}</div>
-    <div class="meta">${r.courier ? 'Доставено с ' + esc(r.courier) : 'Потвърден купувач'}</div>
+    ${meta ? `<div class="meta">${meta}</div>` : ''}
   </div>`;
+}
+
+function openLightbox(src) {
+  let lb = document.getElementById('lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'lightbox'; lb.className = 'lightbox';
+    lb.innerHTML = '<button class="lb-close" aria-label="Затвори">×</button><img alt="">';
+    lb.addEventListener('click', () => lb.classList.remove('open'));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('open'); });
+    document.body.appendChild(lb);
+  }
+  lb.querySelector('img').src = src;
+  lb.classList.add('open');
+}
+
+// Преоразмерява до max px и конвертира в JPG (ползва се за ревюта и в админа)
+async function fileToJpeg(file, max = 1600, quality = 0.85) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error(`Форматът на „${file.name}“ не се поддържа от браузъра. Запази я като JPG или PNG.`));
+      i.src = url;
+    });
+    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const dataUrl = c.toDataURL('image/jpeg', quality);
+    return { url: dataUrl, b64: dataUrl.split(',')[1] };
+  } finally { URL.revokeObjectURL(url); }
 }
 
 async function initPage(active) {

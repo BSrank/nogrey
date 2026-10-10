@@ -166,6 +166,19 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--sage-2); bo
 .stars { color: #c9932b; letter-spacing: 2px; }
 .review .who { font-weight: 700; margin-top: 10px; font-size: .92rem; }
 .review .meta { color: var(--muted); font-size: .82rem; }
+.review-photos { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.review-photos button { width: 76px; height: 76px; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--sage); cursor: zoom-in; }
+.review-photos img { width: 100%; height: 100%; object-fit: cover; }
+.lightbox { position: fixed; inset: 0; background: rgba(10, 20, 15, .9); z-index: 100; display: none; align-items: center; justify-content: center; padding: 16px; cursor: zoom-out; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
+.lb-close { position: absolute; top: 12px; right: 16px; background: none; border: 0; color: #fff; font-size: 2.2rem; cursor: pointer; line-height: 1; }
+.photo-picker { display: flex; gap: 10px; flex-wrap: wrap; }
+.photo-picker .ph { position: relative; width: 86px; height: 86px; border-radius: 10px; overflow: hidden; background: var(--sage); border: 1px solid var(--line); }
+.photo-picker .ph img { width: 100%; height: 100%; object-fit: cover; }
+.photo-picker .ph button { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(20,53,40,.85); color: #fff; cursor: pointer; line-height: 1; font-size: 1rem; }
+.photo-picker .add { width: 86px; height: 86px; border-radius: 10px; border: 2px dashed var(--sage-2); display: grid; place-items: center; text-align: center; color: var(--green); font-weight: 700; font-size: .78rem; cursor: pointer; margin: 0; padding: 6px; }
+.photo-picker .add:hover { background: var(--sage); }
 .star-input { display: flex; gap: 6px; font-size: 2rem; }
 .star-input button { background: none; border: 0; cursor: pointer; color: #d9d9d4; padding: 0; line-height: 1; }
 .star-input button.on { color: #c9932b; }
