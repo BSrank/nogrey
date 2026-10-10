@@ -148,13 +148,13 @@
   // Ревюта: ръчни (от products.json) + одобрени клиентски (от Google Sheet)
   const grid = document.getElementById('reviews-grid');
   let reviews = [];
-  if (s.showManualReviews !== false) reviews = reviews.concat((s.manualReviews || []).map(r => ({ ...r, rating: 5 })));
+  if (s.showManualReviews !== false) reviews = reviews.concat((s.manualReviews || []).map(r => ({ ...r, rating: r.rating || 5, photos: r.photos || [] })));
   grid.innerHTML = reviews.map(reviewCard).join('');
   if (s.showClientReviews !== false && scriptReady()) {
     try {
       const res = await apiGet({ action: 'getReviews' });
       if (res && res.ok) {
-        reviews = reviews.concat(res.reviews.map(r => ({ text: r.text, author: r.name, rating: r.rating })));
+        reviews = reviews.concat(res.reviews.map(r => ({ text: r.text, author: r.name, rating: r.rating, verified: true, photos: (r.photos || []).map(id => driveImg(id)) })));
         grid.innerHTML = reviews.map(reviewCard).join('');
       }
     } catch (e) {}

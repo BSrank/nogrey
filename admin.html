@@ -123,7 +123,15 @@
 
     <!-- Ревюта -->
     <section class="panel" id="tab-reviews">
-      <div class="toolbar"><h2>Ревюта</h2><button class="btn ghost sm" onclick="loadReviews()">Обнови</button></div>
+      <div class="toolbar">
+        <h2>Мои ревюта</h2>
+        <button class="btn ghost sm" onclick="addManualReview()">+ Добави ревю</button>
+        <button class="btn sm" id="mr-save" onclick="saveManualReviews()">Запази ревютата</button>
+      </div>
+      <p class="muted" style="font-size:.88rem;margin-top:-6px">Ревюта, които въвеждаш сам — напр. отзиви от реални клиенти, получени във Facebook, Viber или по телефона. Показват се на началната страница.</p>
+      <div id="manual-reviews"></div>
+      <div class="toolbar" style="margin-top:40px"><h2>От клиенти</h2><button class="btn ghost sm" onclick="loadReviews()">Обнови</button></div>
+      <p class="muted" style="font-size:.88rem;margin-top:-6px">Оставени през линка от „Покана за ревю“. Появяват се на сайта след одобрение.</p>
       <div id="reviews-box"></div>
     </section>
 
@@ -172,13 +180,8 @@
 
         <div class="card">
           <h3>Показване на ревюта</h3>
-          <div class="field"><label class="switch"><input type="checkbox" id="s-showManualReviews"> Ръчни ревюта (по-долу)</label></div>
+          <div class="field"><label class="switch"><input type="checkbox" id="s-showManualReviews"> Моите ревюта (таб „Ревюта“)</label></div>
           <div class="field"><label class="switch"><input type="checkbox" id="s-showClientReviews"> Одобрени клиентски ревюта</label></div>
-        </div>
-
-        <div class="card" style="grid-column:1/-1">
-          <div class="toolbar" style="margin-bottom:10px"><h3 style="margin:0 auto 0 0">Ръчни ревюта</h3><button class="btn ghost sm" onclick="addManualReview()">+ Добави</button></div>
-          <div id="manual-reviews"></div>
         </div>
 
         <div class="card" style="grid-column:1/-1">
@@ -349,26 +352,7 @@ async function fetchRepoB64(path) {
   if (!r.ok) throw new Error('Не мога да прочета ' + path);
   return blobToB64(await r.blob());
 }
-// Преоразмерява до 1600px и конвертира в JPG (галерията на сайта търси само .jpg)
-async function fileToJpeg(file, max = 1600, quality = 0.85) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = () => rej(new Error(`Форматът на „${file.name}“ не се поддържа от браузъра. Запази я като JPG или PNG.`));
-      i.src = url;
-    });
-    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement('canvas');
-    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); // прозрачен PNG → бял фон
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-    const dataUrl = c.toDataURL('image/jpeg', quality);
-    return { url: dataUrl, b64: dataUrl.split(',')[1] };
-  } finally { URL.revokeObjectURL(url); }
-}
+// fileToJpeg() е в assets/cart.js
 function rawUrl(path) {
   if (!path) return '';
   if (/^(https?:|data:)/.test(path)) return path;
@@ -789,6 +773,7 @@ async function loadReviews() {
       <div class="review">
         <div style="display:flex;justify-content:space-between;gap:8px"><span class="stars">${starStr(rv['Оценка'])}</span><span class="st ${rv['Статус'] === 'Одобрено' ? 'st-new' : 'st-noans'}">${esc(rv['Статус'])}</span></div>
         <p style="margin:10px 0">${esc(rv['Текст'])}</p>
+        ${String(rv['Снимки'] || '').trim() ? `<div class="review-photos" style="margin-bottom:10px">${String(rv['Снимки']).split(',').map(x => x.trim()).filter(Boolean).map(id => `<button type="button" onclick="openLightbox('${esc(driveImg(id))}')"><img src="${esc(driveImg(id, 300))}" alt=""></button>`).join('')}</div>` : ''}
         <div class="who">${esc(rv['Име'])}</div>
         <div class="meta">${esc(rv['OrderID'])} · ${esc(rv['Дата'])}${rv['Награден код'] ? ' · код ' + esc(rv['Награден код']) : ''}</div>
         <div style="display:flex;gap:8px;margin-top:12px">
@@ -825,21 +810,91 @@ function fillSettings() {
   S_BOOL.forEach(k => document.getElementById('s-' + k).checked = s[k] !== false);
   document.getElementById('u-enabled').checked = !!DATA.urgency.enabled;
   MANUAL = JSON.parse(JSON.stringify(s.manualReviews || []));
+  MANUAL_ORIG_PHOTOS = MANUAL.flatMap(r => r.photos || []);
   renderManual();
   renderHeroPreview();
 }
+/* ======= Мои ревюта (settings.manualReviews) ======= */
+const MR_MAX_PHOTOS = 3;
+let MANUAL_ORIG_PHOTOS = [];
+let MR_SAVING = false;
+function mrPhotoSrc(p) { return typeof p === 'string' ? rawUrl(p) : p.url; }
 function renderManual() {
   const box = document.getElementById('manual-reviews');
-  box.innerHTML = MANUAL.length ? MANUAL.map((r, i) => `
-    <div class="sec-block">
-      <div class="row2" style="margin-bottom:8px">
-        <input placeholder="Автор" value="${esc(r.author)}" oninput="MANUAL[${i}].author=this.value">
-        <div class="promo-row"><input placeholder="Куриер (напр. Econt)" value="${esc(r.courier)}" oninput="MANUAL[${i}].courier=this.value"><button class="btn danger ghost sm" onclick="MANUAL.splice(${i},1);renderManual()">×</button></div>
-      </div>
-      <textarea rows="2" placeholder="Текст на ревюто" oninput="MANUAL[${i}].text=this.value">${esc(r.text)}</textarea>
-    </div>`).join('') : '<p class="muted">Няма ръчни ревюта.</p>';
+  if (!MANUAL.length) { box.innerHTML = '<div class="card empty-state">Още няма. Натисни „+ Добави ревю“.</div>'; return; }
+  const pending = MANUAL.some(r => (r.photos || []).some(p => typeof p !== 'string'));
+  box.innerHTML = (pending ? '<p style="font-size:.88rem;color:var(--warn)">Има незапазени снимки — натисни „Запази ревютата“.</p>' : '')
+    + '<div class="reviews-grid">' + MANUAL.map((r, i) => {
+      const photos = r.photos || [];
+      return `
+      <div class="review">
+        <div class="row2" style="gap:8px;margin-bottom:8px">
+          <input placeholder="Име (напр. Иван П.)" value="${esc(r.author)}" oninput="MANUAL[${i}].author=this.value">
+          <select onchange="MANUAL[${i}].rating=Number(this.value)" aria-label="Оценка">${[5, 4, 3, 2, 1].map(n => `<option value="${n}" ${(Number(r.rating) || 5) === n ? 'selected' : ''}>${'★'.repeat(n)}${'☆'.repeat(5 - n)}</option>`).join('')}</select>
+        </div>
+        <textarea rows="3" placeholder="Текст на ревюто" oninput="MANUAL[${i}].text=this.value" style="margin-bottom:8px">${esc(r.text)}</textarea>
+        <input placeholder="Куриер (по желание) → „Доставено с …“" value="${esc(r.courier)}" oninput="MANUAL[${i}].courier=this.value" style="margin-bottom:10px">
+        <div class="photo-picker">
+          ${photos.map((p, k) => `<div class="ph"><img src="${esc(mrPhotoSrc(p))}" alt="" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"><button type="button" onclick="removeManualPhoto(${i},${k})" aria-label="Махни">×</button></div>`).join('')}
+          ${photos.length < MR_MAX_PHOTOS ? `<label class="add">+ Снимка<input type="file" accept="image/*" multiple hidden onchange="addManualPhotos(this,${i})"></label>` : ''}
+        </div>
+        <button class="btn danger ghost sm" style="margin-top:12px" onclick="removeManual(${i})">Изтрий ревюто</button>
+      </div>`;
+    }).join('') + '</div>';
 }
-function addManualReview() { MANUAL.push({ text: '', author: '', courier: 'Econt' }); renderManual(); }
+function addManualReview() { MANUAL.unshift({ text: '', author: '', courier: '', rating: 5, photos: [] }); renderManual(); }
+function removeManual(i) { if (!confirm('Да изтрия ли това ревю?')) return; MANUAL.splice(i, 1); renderManual(); }
+function removeManualPhoto(i, k) { MANUAL[i].photos.splice(k, 1); renderManual(); }
+async function addManualPhotos(input, i) {
+  const r = MANUAL[i]; r.photos = r.photos || [];
+  const files = [...input.files].slice(0, MR_MAX_PHOTOS - r.photos.length); input.value = '';
+  for (const f of files) {
+    try { r.photos.push(await fileToJpeg(f, 1200, 0.82)); }
+    catch (err) { alert(err.message); }
+  }
+  renderManual();
+}
+async function saveManualReviews() {
+  if (MR_SAVING) return;
+  const btn = document.getElementById('mr-save');
+  MR_SAVING = true; btn.disabled = true;
+  try {
+    await saveChain; // без паралелни commit-и
+    const ts = Date.now().toString(36);
+    let n = 0;
+    for (const r of MANUAL) {
+      r.photos = r.photos || [];
+      for (let k = 0; k < r.photos.length; k++) {
+        if (typeof r.photos[k] === 'string') continue;
+        const path = `uploads/reviews/${ts}-${++n}.jpg`;
+        btn.textContent = `Качване на снимка ${n}…`;
+        await ghPutRetry(path, r.photos[k].b64, 'Снимка към ревю');
+        r.photos[k] = path;
+      }
+    }
+  } catch (err) {
+    alert('Грешка при качване: ' + err.message);
+    MR_SAVING = false; btn.disabled = false; btn.textContent = 'Запази ревютата'; renderManual();
+    return;
+  }
+  DATA.settings.manualReviews = MANUAL.filter(r => (r.text || '').trim()).map(r => ({
+    text: r.text.trim(), author: (r.author || '').trim(), courier: (r.courier || '').trim(),
+    rating: Number(r.rating) || 5, photos: (r.photos || []).filter(p => typeof p === 'string')
+  }));
+  const keep = new Set(DATA.settings.manualReviews.flatMap(r => r.photos));
+  const orphans = MANUAL_ORIG_PHOTOS.filter(p => !keep.has(p) && p.startsWith('uploads/reviews/'));
+  btn.textContent = 'Запазване…';
+  const ok = await queueGitHubSave('Ревюта');
+  MR_SAVING = false; btn.disabled = false; btn.textContent = 'Запази ревютата';
+  renderManual();
+  if (!ok) return;
+  MANUAL_ORIG_PHOTOS = [...keep];
+  toast('Ревютата са запазени');
+  if (orphans.length) saveChain = saveChain.then(async () => {
+    for (const x of orphans) { try { await ghDeleteFile(x, 'Премахната снимка от ревю'); } catch (err) {} }
+    return true;
+  });
+}
 function saveSettings() {
   const s = DATA.settings;
   S_TEXT.forEach(k => s[k] = document.getElementById('s-' + k).value.trim());
@@ -847,7 +902,6 @@ function saveSettings() {
   S_BOOL.forEach(k => s[k] = document.getElementById('s-' + k).checked);
   s.rewardDiscountChance = Math.max(0, Math.min(100, s.rewardDiscountChance));
   s.rewardDiscountPercent = Math.max(1, Math.min(90, s.rewardDiscountPercent || 10));
-  s.manualReviews = MANUAL.filter(r => (r.text || '').trim()).map(r => ({ text: r.text.trim(), author: (r.author || '').trim(), courier: (r.courier || '').trim() }));
   DATA.urgency.enabled = document.getElementById('u-enabled').checked;
   queueGitHubSave('Настройки').then(() => { renderProducts(); toast('Настройките са запазени'); });
 }

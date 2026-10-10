@@ -37,9 +37,35 @@
       <div class="field"><label>Оценка</label><div class="star-input" id="stars">${[1,2,3,4,5].map(n => `<button type="button" data-n="${n}" aria-label="${n} звезди">★</button>`).join('')}</div></div>
       <div class="field"><label for="r-name">Име, което да се показва</label><input id="r-name" value="${esc((info.name || '').split(' ')[0])}" required></div>
       <div class="field"><label for="r-text">Вашето мнение</label><textarea id="r-text" rows="5" required placeholder="Колко бързо видяхте резултат? Как изглежда цветът?"></textarea></div>
+      <div class="field">
+        <label>Снимки (по желание, до 3)</label>
+        <div class="photo-picker" id="photos"></div>
+        <small>Например „преди и след“. Снимките ще се виждат на сайта заедно с ревюто.</small>
+      </div>
       <button class="btn block" type="submit">Изпрати ревюто</button>
       <div id="st" style="margin-top:12px"></div>
     </form>`;
+  const MAX = 3;
+  let photos = []; // [{url, b64}]
+  const renderPhotos = () => {
+    document.getElementById('photos').innerHTML = photos.map((p, i) =>
+      `<div class="ph"><img src="${p.url}" alt=""><button type="button" aria-label="Махни" data-rm="${i}">×</button></div>`).join('')
+      + (photos.length < MAX ? `<label class="add">+ Добави снимка<input type="file" accept="image/*" multiple hidden id="ph-input"></label>` : '');
+    const inp = document.getElementById('ph-input');
+    if (inp) inp.onchange = async () => {
+      const files = [...inp.files].slice(0, MAX - photos.length);
+      for (const f of files) {
+        try { photos.push(await fileToJpeg(f, 1200, 0.8)); }
+        catch (err) { document.getElementById('st').innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
+      }
+      renderPhotos();
+    };
+  };
+  document.getElementById('photos').addEventListener('click', e => {
+    const b = e.target.closest('[data-rm]'); if (!b) return;
+    photos.splice(Number(b.dataset.rm), 1); renderPhotos();
+  });
+  renderPhotos();
   const paint = () => document.querySelectorAll('#stars button').forEach(b => b.classList.toggle('on', Number(b.dataset.n) <= rating));
   paint();
   document.getElementById('stars').onclick = e => { const b = e.target.closest('button'); if (b) { rating = Number(b.dataset.n); paint(); } };
@@ -49,11 +75,12 @@
     const st = document.getElementById('st');
     if (text.length < 10) { st.innerHTML = '<div class="notice error">Моля, напишете поне няколко думи.</div>'; return; }
     const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
+    btn.textContent = photos.length ? 'Изпращане на снимките…' : 'Изпращане…';
     try {
-      const r = await apiPost({ action: 'submitReview', token, rating, name: document.getElementById('r-name').value.trim(), text });
+      const r = await apiPost({ action: 'submitReview', token, rating, name: document.getElementById('r-name').value.trim(), text, photos: photos.map(p => p.b64) });
       if (!r.ok) throw new Error(r.error || 'Грешка при изпращане.');
       root.innerHTML = '<h1 style="font-size:2rem">Благодарим!</h1><div class="notice ok">Ревюто ви е получено. След одобрение ще ви изпратим наградата по имейл.</div><p style="margin-top:20px"><a href="index.html">Към началото</a></p>';
-    } catch (err) { st.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; btn.disabled = false; }
+    } catch (err) { st.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; btn.disabled = false; btn.textContent = 'Изпрати ревюто'; }
   });
 })();
 </script>
