@@ -251,6 +251,14 @@ function renderChrome(active) {
         </div>
       </div>
     </footer>`;
+  // Мобилно меню: затваря се при избор на линк или клик извън него
+  const nav = document.getElementById('nav');
+  if (nav) {
+    nav.addEventListener('click', e => { if (e.target.closest('a')) nav.classList.remove('open'); });
+    document.addEventListener('click', e => {
+      if (nav.classList.contains('open') && !e.target.closest('#nav, .menu-toggle')) nav.classList.remove('open');
+    });
+  }
   updateCartCount();
   renderDrawer();
 }

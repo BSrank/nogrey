@@ -35,6 +35,8 @@ p { margin: 0 0 1em; }
 .muted { color: var(--muted); }
 .eyebrow { font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--green-2); font-weight: 700; }
 .section { padding: 64px 0; }
+/* при скок към #how, #contact и т.н. заглавието да не остава под залепеното меню */
+section[id] { scroll-margin-top: 64px; }
 .section-head { max-width: 640px; margin-bottom: 32px; }
 .center { text-align: center; margin-left: auto; margin-right: auto; }
 
