@@ -69,13 +69,13 @@
   </div>
 </section>
 
-<section class="section band">
+<section class="section band" id="choose">
   <div class="container">
     <div class="section-head center" style="text-align:center">
-      <div class="eyebrow">Кое да избера</div>
-      <h2>Шампоан или серум?</h2>
+      <div class="eyebrow" id="choose-eyebrow">Кое да избера</div>
+      <h2 id="choose-title">Шампоан или серум?</h2>
     </div>
-    <div class="grid-3" style="grid-template-columns:1fr 1fr">
+    <div class="grid-3" id="choose-list" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
       <div class="card">
         <h3>Оцветяващ шампоан</h3>
         <p class="muted">За бърз видим резултат. Покрива вече побелелите косми с пигмент постепенно, за няколко измивания.</p>
@@ -145,6 +145,14 @@
   const benefits = getBenefits(s);
   if (benefits.length) document.getElementById('benefits').innerHTML = benefitsHtml(benefits);
   else document.getElementById('benefits-section').style.display = 'none';
+
+  // „Кое да избера“ (редактира се от Админ → Настройки)
+  const ch = getChoose(s);
+  if (ch.items.length) {
+    document.getElementById('choose-eyebrow').textContent = ch.eyebrow;
+    document.getElementById('choose-title').textContent = ch.title;
+    document.getElementById('choose-list').innerHTML = chooseHtml(ch.items);
+  } else document.getElementById('choose').style.display = 'none';
 
   // Често задавани въпроси (редактират се от Админ → Настройки)
   const faq = getFaq(s);
