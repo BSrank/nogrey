@@ -29,9 +29,9 @@
   </div>
 </section>
 
-<section class="section">
+<section class="section" id="benefits-section">
   <div class="container">
-    <div class="grid-4">
+    <div class="grid-4" id="benefits">
       <div class="card"><div class="icon-dot">1</div><h3>Като обикновен шампоан</h3><p class="muted">Нанасяте, масажирате, изплаквате. Без ръкавици, купички и чакане в салон.</p></div>
       <div class="card"><div class="icon-dot">2</div><h3>Постепенен цвят</h3><p class="muted">Бялото се покрива плавно за няколко измивания — изглежда естествено, не „боядисано“.</p></div>
       <div class="card"><div class="icon-dot">3</div><h3>За коса и брада</h3><p class="muted">Подходящ и за брадата, и за мустаците — един продукт за цялото лице.</p></div>
@@ -103,7 +103,7 @@
 <section class="section band" id="faq">
   <div class="container faq">
     <div class="section-head center" style="text-align:center"><div class="eyebrow">Въпроси</div><h2>Често задавани въпроси</h2></div>
-    <div class="acc">
+    <div class="acc" id="faq-list">
       <details><summary>След колко измивания се вижда ефект?</summary><ul><li>Обикновено след 3–5 измивания цветът е видимо по-наситен. При гъста бяла коса може да отнеме малко повече.</li></ul></details>
       <details><summary>Оцветява ли кожата или кърпите?</summary><ul><li>Изплакнете добре и избършете с тъмна кърпа при първите употреби. По кожата пигментът се отмива с вода и сапун.</li></ul></details>
       <details><summary>Мога ли да го ползвам за брада?</summary><ul><li>Да — нанесете върху мократа брада и оставете 5 минути. Брадата обикновено поема цвета по-бързо от косата.</li></ul></details>
@@ -121,6 +121,7 @@
 </section>
 
 <div id="site-footer"></div>
+<script src="assets/config.js"></script>
 <script src="assets/cart.js"></script>
 <script>
 (async function () {
@@ -139,6 +140,16 @@
       hero.classList.add('has-bg');
     });
   }
+
+  // Предимства (редактират се от Админ → Настройки)
+  const benefits = getBenefits(s);
+  if (benefits.length) document.getElementById('benefits').innerHTML = benefitsHtml(benefits);
+  else document.getElementById('benefits-section').style.display = 'none';
+
+  // Често задавани въпроси (редактират се от Админ → Настройки)
+  const faq = getFaq(s);
+  if (faq.length) document.getElementById('faq-list').innerHTML = faqHtml(faq);
+  else document.getElementById('faq').style.display = 'none';
 
   const featured = activeProducts().slice(0, 4);
   document.getElementById('featured-grid').innerHTML = featured.length
