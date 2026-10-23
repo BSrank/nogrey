@@ -41,6 +41,34 @@
       ],
       "active": true,
       "isNewListing": true
+    },
+    {
+      "id": "nogrey-serum",
+      "name": "Nogrey Serum",
+      "category": "serum",
+      "price": 30,
+      "priceBgn": 58.67,
+      "comparePrice": 0,
+      "comparePriceBgn": 0,
+      "imageMain": "images/nogrey-serum/main-mvlg9dpx.jpg",
+      "imagePrefix": "images/nogrey-serum/gmvlg9dpx",
+      "previewFeatures": [],
+      "sections": [
+        {
+          "title": "Как се използва",
+          "items": [
+            "."
+          ]
+        },
+        {
+          "title": "Съставки",
+          "items": [
+            "."
+          ]
+        }
+      ],
+      "active": true,
+      "isNewListing": true
     }
   ],
   "settings": {
