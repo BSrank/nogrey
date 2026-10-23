@@ -1,8 +1,8 @@
 /* NoGrey — общ фронтенд скрипт (header/footer, количка, данни, снимки, връзка с Apps Script) */
 
-// ⚠️ След деплой на Code.gs като Web App — постави тук URL-а му.
+// URL-ът на Apps Script се задава в assets/config.js (не тук).
 const GOOGLE_SHEETS_CONFIG = {
-  webAppUrl: 'https://script.google.com/macros/s/AKfycbzAUcHOQeCXiD2RN-rs_gBvEgd98FdhX_hRVntlcZBRkxhb8MK5JYPmjJsbb-y6ys4C/exec'
+  webAppUrl: String((window.NOGREY_CONFIG && window.NOGREY_CONFIG.webAppUrl) || '').trim()
 };
 
 const BGN_RATE = 1.95583;
@@ -103,16 +103,16 @@ function imgTag(src, alt, cls) {
 }
 
 /* ---------- Apps Script ---------- */
-function scriptReady() { return /^https:\/\/script\.google\.com\//.test(GOOGLE_SHEETS_CONFIG.webAppUrl); }
+function scriptReady() { return /^https:\/\/script\.google(usercontent)?\.com\/.+/.test(GOOGLE_SHEETS_CONFIG.webAppUrl); }
 async function apiGet(params) {
-  if (!scriptReady()) throw new Error('Бекендът още не е свързан (webAppUrl).');
+  if (!scriptReady()) throw new Error('Бекендът още не е свързан (webAppUrl в assets/config.js).');
   const url = GOOGLE_SHEETS_CONFIG.webAppUrl + '?' + new URLSearchParams(params).toString();
   const r = await fetch(url);
   return r.json();
 }
 // text/plain → без CORS preflight; Code.gs парсва тялото ръчно като JSON.
 async function apiPost(body) {
-  if (!scriptReady()) throw new Error('Бекендът още не е свързан (webAppUrl).');
+  if (!scriptReady()) throw new Error('Бекендът още не е свързан (webAppUrl в assets/config.js).');
   const r = await fetch(GOOGLE_SHEETS_CONFIG.webAppUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -261,6 +261,35 @@ function renderChrome(active) {
   }
   updateCartCount();
   renderDrawer();
+}
+
+/* ---------- Предимства на началната страница (settings.benefits) ---------- */
+const DEFAULT_BENEFITS = [
+  { title: 'Като обикновен шампоан', text: 'Нанасяте, масажирате, изплаквате. Без ръкавици, купички и чакане в салон.' },
+  { title: 'Постепенен цвят', text: 'Бялото се покрива плавно за няколко измивания — изглежда естествено, не „боядисано“.' },
+  { title: 'За коса и брада', text: 'Подходящ и за брадата, и за мустаците — един продукт за цялото лице.' },
+  { title: 'Серум за корена', text: 'Серумът подхранва скалпа и се нанася ежедневно като допълнение към шампоана.' }
+];
+function getBenefits(s) {
+  return Array.isArray(s && s.benefits) ? s.benefits.filter(b => b && (b.title || b.text)) : DEFAULT_BENEFITS;
+}
+function benefitsHtml(list) {
+  return list.map((b, i) => `<div class="card"><div class="icon-dot">${i + 1}</div><h3>${esc(b.title)}</h3><p class="muted">${esc(b.text)}</p></div>`).join('');
+}
+
+/* ---------- Често задавани въпроси (settings.faq) ---------- */
+const DEFAULT_FAQ = [
+  { q: 'След колко измивания се вижда ефект?', a: 'Обикновено след 3–5 измивания цветът е видимо по-наситен. При гъста бяла коса може да отнеме малко повече.' },
+  { q: 'Оцветява ли кожата или кърпите?', a: 'Изплакнете добре и избършете с тъмна кърпа при първите употреби. По кожата пигментът се отмива с вода и сапун.' },
+  { q: 'Мога ли да го ползвам за брада?', a: 'Да — нанесете върху мократа брада и оставете 5 минути. Брадата обикновено поема цвета по-бързо от косата.' },
+  { q: 'Как плащам?', a: 'Само с наложен платеж — плащате на куриера в брой при получаване в офис на Econt.' },
+  { q: 'Мога ли да откажа поръчката?', a: 'Да. Ако сте оставили имейл, ще получите линк „Откажи поръчката си“ в потвърждението. Повече в „Условия и наложен платеж“ в долната част на страницата.' }
+];
+function getFaq(s) {
+  return Array.isArray(s && s.faq) ? s.faq.filter(x => x && x.q) : DEFAULT_FAQ;
+}
+function faqHtml(list) {
+  return list.map(x => `<details><summary>${esc(x.q)}</summary><ul><li>${esc(x.a).replace(/\n/g, '<br>')}</li></ul></details>`).join('');
 }
 
 /* ---------- Продуктова карта ---------- */
