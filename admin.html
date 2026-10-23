@@ -167,6 +167,16 @@
         </div>
 
         <div class="card" style="grid-column:1/-1">
+          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Секция „Кое да избера“</h3><button class="btn ghost sm" onclick="addChoose()">+ Добави карта</button></div>
+          <p class="muted" style="font-size:.86rem;margin-top:0">Картите на светлозелен фон на началната страница. Без нито една карта — секцията се скрива.</p>
+          <div class="row2">
+            <div class="field"><label>Малък надпис отгоре</label><input id="ch-eyebrow" placeholder="Кое да избера"></div>
+            <div class="field"><label>Заглавие</label><input id="ch-title" placeholder="Шампоан или серум?"></div>
+          </div>
+          <div id="choose-edit" class="settings-grid"></div>
+        </div>
+
+        <div class="card" style="grid-column:1/-1">
           <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Често задавани въпроси</h3><button class="btn ghost sm" onclick="addFaq()">+ Добави въпрос</button></div>
           <p class="muted" style="font-size:.86rem;margin-top:0">Показват се най-долу на началната страница. Без нито един — секцията се скрива.</p>
           <div id="faq-edit"></div>
@@ -826,6 +836,11 @@ function fillSettings() {
   renderManual();
   BENEFITS = JSON.parse(JSON.stringify(getBenefits(s)));
   renderBenefits();
+  const ch = getChoose(s);
+  document.getElementById('ch-eyebrow').value = ch.eyebrow;
+  document.getElementById('ch-title').value = ch.title;
+  CHOOSE = JSON.parse(JSON.stringify(ch.items));
+  renderChoose();
   FAQ = JSON.parse(JSON.stringify(getFaq(s)));
   renderFaq();
   renderHeroPreview();
@@ -936,6 +951,33 @@ function moveBenefit(i, d) {
   [BENEFITS[i], BENEFITS[j]] = [BENEFITS[j], BENEFITS[i]]; renderBenefits();
 }
 
+/* ======= „Кое да избера“ ======= */
+let CHOOSE = [];
+const CHOOSE_LINKS = [['shampoo', 'Шампоани'], ['serum', 'Серуми'], ['set', 'Комплекти'], ['all', 'Всички продукти'], ['', 'Без линк']];
+function renderChoose() {
+  const box = document.getElementById('choose-edit');
+  box.style.gridTemplateColumns = CHOOSE.length ? '' : '1fr';
+  box.innerHTML = CHOOSE.length ? CHOOSE.map((x, i) => `
+    <div class="sec-block" style="margin:0">
+      <input placeholder="Заглавие на картата" value="${esc(x.title)}" oninput="CHOOSE[${i}].title=this.value" style="margin-bottom:8px;font-weight:700">
+      <textarea rows="3" placeholder="Текст" oninput="CHOOSE[${i}].text=this.value" style="margin-bottom:8px">${esc(x.text)}</textarea>
+      <div class="row2" style="gap:8px">
+        <input placeholder="Текст на линка (напр. Виж шампоаните →)" value="${esc(x.linkText)}" oninput="CHOOSE[${i}].linkText=this.value">
+        <select onchange="CHOOSE[${i}].cat=this.value" aria-label="Линкът води към">${CHOOSE_LINKS.map(([v, l]) => `<option value="${v}" ${(x.cat || '') === v ? 'selected' : ''}>→ ${l}</option>`).join('')}</select>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" class="btn ghost sm" onclick="moveChoose(${i},-1)" ${i === 0 ? 'disabled' : ''}>←</button>
+        <button type="button" class="btn ghost sm" onclick="moveChoose(${i},1)" ${i === CHOOSE.length - 1 ? 'disabled' : ''}>→</button>
+        <button type="button" class="btn danger ghost sm" onclick="CHOOSE.splice(${i},1);renderChoose()">Махни</button>
+      </div>
+    </div>`).join('') : '<p class="muted">Няма карти — секцията няма да се показва.</p>';
+}
+function addChoose() { CHOOSE.push({ title: '', text: '', linkText: '', cat: 'all' }); renderChoose(); }
+function moveChoose(i, d) {
+  const j = i + d; if (j < 0 || j >= CHOOSE.length) return;
+  [CHOOSE[i], CHOOSE[j]] = [CHOOSE[j], CHOOSE[i]]; renderChoose();
+}
+
 /* ======= Често задавани въпроси ======= */
 let FAQ = [];
 function renderFaq() {
@@ -959,6 +1001,11 @@ function moveFaq(i, d) {
 
 function saveSettings() {
   const s = DATA.settings;
+  s.choose = {
+    eyebrow: document.getElementById('ch-eyebrow').value.trim(),
+    title: document.getElementById('ch-title').value.trim(),
+    items: CHOOSE.map(x => ({ title: (x.title || '').trim(), text: (x.text || '').trim(), linkText: (x.linkText || '').trim(), cat: x.cat || '' })).filter(x => x.title || x.text)
+  };
   s.faq = FAQ.map(x => ({ q: (x.q || '').trim(), a: (x.a || '').trim() })).filter(x => x.q);
   s.benefits = BENEFITS.map(b => ({ title: (b.title || '').trim(), text: (b.text || '').trim() })).filter(b => b.title || b.text);
   S_TEXT.forEach(k => s[k] = document.getElementById('s-' + k).value.trim());
