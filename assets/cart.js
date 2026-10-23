@@ -292,6 +292,28 @@ function faqHtml(list) {
   return list.map(x => `<details><summary>${esc(x.q)}</summary><ul><li>${esc(x.a).replace(/\n/g, '<br>')}</li></ul></details>`).join('');
 }
 
+/* ---------- „Кое да избера“ (settings.choose) ---------- */
+const DEFAULT_CHOOSE = {
+  eyebrow: 'Кое да избера',
+  title: 'Шампоан или серум?',
+  items: [
+    { title: 'Оцветяващ шампоан', text: 'За бърз видим резултат. Покрива вече побелелите косми с пигмент постепенно, за няколко измивания.', linkText: 'Виж шампоаните →', cat: 'shampoo' },
+    { title: 'Серум против бяла коса', text: 'За ежедневна грижа за скалпа и корена. Нанася се след измиване, без изплакване. Отлично допълнение към шампоана.', linkText: 'Виж серумите →', cat: 'serum' }
+  ]
+};
+function getChoose(s) {
+  const c = s && s.choose;
+  if (!c || !Array.isArray(c.items)) return DEFAULT_CHOOSE;
+  return { eyebrow: c.eyebrow || '', title: c.title || '', items: c.items.filter(x => x && (x.title || x.text)) };
+}
+function chooseLink(cat) { return cat === 'all' ? 'products.html' : cat ? 'products.html?cat=' + encodeURIComponent(cat) : ''; }
+function chooseHtml(items) {
+  return items.map(x => {
+    const href = chooseLink(x.cat);
+    return `<div class="card"><h3>${esc(x.title)}</h3><p class="muted">${esc(x.text)}</p>${href && x.linkText ? `<a href="${href}">${esc(x.linkText)}</a>` : ''}</div>`;
+  }).join('');
+}
+
 /* ---------- Продуктова карта ---------- */
 function productCard(p) {
   const u = urgencyCount(p.id);
