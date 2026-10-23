@@ -160,6 +160,18 @@
           <div id="hero-status"></div>
         </div>
 
+        <div class="card" style="grid-column:1/-1">
+          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Предимства на началната страница</h3><button class="btn ghost sm" onclick="addBenefit()">+ Добави</button></div>
+          <p class="muted" style="font-size:.86rem;margin-top:0">Картите с номера под заглавието на началната страница. Най-добре изглеждат 4 (или 2, 3, 8). Без нито една — секцията се скрива.</p>
+          <div id="benefits-edit" class="settings-grid"></div>
+        </div>
+
+        <div class="card" style="grid-column:1/-1">
+          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Често задавани въпроси</h3><button class="btn ghost sm" onclick="addFaq()">+ Добави въпрос</button></div>
+          <p class="muted" style="font-size:.86rem;margin-top:0">Показват се най-долу на началната страница. Без нито един — секцията се скрива.</p>
+          <div id="faq-edit"></div>
+        </div>
+
         <div class="card">
           <h3>Контакт</h3>
           <div class="field"><label>Начин на контакт</label><select id="s-contactMode"><option value="form">Форма на сайта</option><option value="phone">Телефон</option></select></div>
@@ -716,7 +728,7 @@ async function submitProduct(e) {
 function stClass(s) { return s === 'Нова' ? 'st-new' : s === 'Отказана' ? 'st-cancel' : 'st-noans'; }
 async function loadOrders() {
   const box = document.getElementById('orders-box');
-  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен webAppUrl в assets/cart.js.</div>'; return; }
+  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен webAppUrl в assets/config.js.</div>'; return; }
   box.innerHTML = '<div class="spinner"></div>';
   try {
     const r = await withRetry(() => adminCall('adminGetOrders'));
@@ -763,7 +775,7 @@ async function orderAction(action, orderId, question) {
 /* ======= Ревюта ======= */
 async function loadReviews() {
   const box = document.getElementById('reviews-box');
-  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен webAppUrl в assets/cart.js.</div>'; return; }
+  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен webAppUrl в assets/config.js.</div>'; return; }
   box.innerHTML = '<div class="spinner"></div>';
   try {
     const r = await withRetry(() => adminCall('adminGetReviews'));
@@ -812,6 +824,10 @@ function fillSettings() {
   MANUAL = JSON.parse(JSON.stringify(s.manualReviews || []));
   MANUAL_ORIG_PHOTOS = MANUAL.flatMap(r => r.photos || []);
   renderManual();
+  BENEFITS = JSON.parse(JSON.stringify(getBenefits(s)));
+  renderBenefits();
+  FAQ = JSON.parse(JSON.stringify(getFaq(s)));
+  renderFaq();
   renderHeroPreview();
 }
 /* ======= Мои ревюта (settings.manualReviews) ======= */
@@ -895,8 +911,56 @@ async function saveManualReviews() {
     return true;
   });
 }
+/* ======= Предимства ======= */
+let BENEFITS = [];
+function renderBenefits() {
+  const box = document.getElementById('benefits-edit');
+  box.style.gridTemplateColumns = BENEFITS.length ? '' : '1fr';
+  box.innerHTML = BENEFITS.length ? BENEFITS.map((b, i) => `
+    <div class="sec-block" style="margin:0">
+      <div class="promo-row" style="margin-bottom:8px">
+        <span class="icon-dot" style="width:34px;height:34px;margin:0;flex:none;font-size:.9rem">${i + 1}</span>
+        <input placeholder="Заглавие" value="${esc(b.title)}" oninput="BENEFITS[${i}].title=this.value">
+      </div>
+      <textarea rows="2" placeholder="Текст" oninput="BENEFITS[${i}].text=this.value">${esc(b.text)}</textarea>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" class="btn ghost sm" onclick="moveBenefit(${i},-1)" ${i === 0 ? 'disabled' : ''}>←</button>
+        <button type="button" class="btn ghost sm" onclick="moveBenefit(${i},1)" ${i === BENEFITS.length - 1 ? 'disabled' : ''}>→</button>
+        <button type="button" class="btn danger ghost sm" onclick="BENEFITS.splice(${i},1);renderBenefits()">Махни</button>
+      </div>
+    </div>`).join('') : '<p class="muted">Няма предимства — секцията няма да се показва.</p>';
+}
+function addBenefit() { BENEFITS.push({ title: '', text: '' }); renderBenefits(); }
+function moveBenefit(i, d) {
+  const j = i + d; if (j < 0 || j >= BENEFITS.length) return;
+  [BENEFITS[i], BENEFITS[j]] = [BENEFITS[j], BENEFITS[i]]; renderBenefits();
+}
+
+/* ======= Често задавани въпроси ======= */
+let FAQ = [];
+function renderFaq() {
+  const box = document.getElementById('faq-edit');
+  box.innerHTML = FAQ.length ? FAQ.map((x, i) => `
+    <div class="sec-block">
+      <input placeholder="Въпрос" value="${esc(x.q)}" oninput="FAQ[${i}].q=this.value" style="margin-bottom:8px;font-weight:700">
+      <textarea rows="2" placeholder="Отговор" oninput="FAQ[${i}].a=this.value">${esc(x.a)}</textarea>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" class="btn ghost sm" onclick="moveFaq(${i},-1)" ${i === 0 ? 'disabled' : ''} title="Нагоре">↑</button>
+        <button type="button" class="btn ghost sm" onclick="moveFaq(${i},1)" ${i === FAQ.length - 1 ? 'disabled' : ''} title="Надолу">↓</button>
+        <button type="button" class="btn danger ghost sm" onclick="FAQ.splice(${i},1);renderFaq()">Махни</button>
+      </div>
+    </div>`).join('') : '<p class="muted">Няма въпроси — секцията няма да се показва.</p>';
+}
+function addFaq() { FAQ.push({ q: '', a: '' }); renderFaq(); }
+function moveFaq(i, d) {
+  const j = i + d; if (j < 0 || j >= FAQ.length) return;
+  [FAQ[i], FAQ[j]] = [FAQ[j], FAQ[i]]; renderFaq();
+}
+
 function saveSettings() {
   const s = DATA.settings;
+  s.faq = FAQ.map(x => ({ q: (x.q || '').trim(), a: (x.a || '').trim() })).filter(x => x.q);
+  s.benefits = BENEFITS.map(b => ({ title: (b.title || '').trim(), text: (b.text || '').trim() })).filter(b => b.title || b.text);
   S_TEXT.forEach(k => s[k] = document.getElementById('s-' + k).value.trim());
   S_NUM.forEach(k => s[k] = Number(document.getElementById('s-' + k).value) || 0);
   S_BOOL.forEach(k => s[k] = document.getElementById('s-' + k).checked);
