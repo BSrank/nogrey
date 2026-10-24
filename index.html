@@ -54,16 +54,16 @@
 <section class="section" id="how">
   <div class="container">
     <div class="section-head center" style="text-align:center">
-      <div class="eyebrow">Как действа</div>
-      <h2>Три стъпки под душа</h2>
-      <p class="muted">Оцветяващият шампоан съдържа пигменти, които се натрупват постепенно по бялата коса. Колкото по-дълго действа, толкова по-наситен е цветът.</p>
+      <div class="eyebrow" id="how-eyebrow">Как действа</div>
+      <h2 id="how-title">Три стъпки под душа</h2>
+      <p class="muted" id="how-intro">Оцветяващият шампоан съдържа пигменти, които се натрупват постепенно по бялата коса. Колкото по-дълго действа, толкова по-наситен е цветът.</p>
     </div>
-    <div class="grid-3">
+    <div class="grid-3" id="how-steps" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
       <div class="card"><div class="step-num">01</div><h3>Намокрете и нанесете</h3><p class="muted">Нанесете върху мократа коса или брада и разпределете равномерно, без да пропускате корените.</p></div>
       <div class="card"><div class="step-num">02</div><h3>Оставете 5–10 минути</h3><p class="muted">Докато се къпете, пигментът действа. За по-тъмен резултат — по-дълго.</p></div>
       <div class="card"><div class="step-num">03</div><h3>Изплакнете обилно</h3><p class="muted">Изплакнете до бистра вода. Повтаряйте 2–3 пъти седмично за поддържане на цвета.</p></div>
     </div>
-    <div class="notice" style="margin-top:24px;max-width:760px;margin-left:auto;margin-right:auto">
+    <div class="notice" id="how-notice" style="margin-top:24px;max-width:760px;margin-left:auto;margin-right:auto">
       <strong>Тест за чувствителност:</strong> 48 часа преди първата употреба нанесете малко количество зад ухото. При зачервяване или сърбеж не използвайте продукта.
     </div>
   </div>
@@ -145,6 +145,19 @@
   const benefits = getBenefits(s);
   if (benefits.length) document.getElementById('benefits').innerHTML = benefitsHtml(benefits);
   else document.getElementById('benefits-section').style.display = 'none';
+
+  // „Как действа“ (редактира се от Админ → Настройки)
+  const how = getHow(s);
+  if (how.steps.length) {
+    document.getElementById('how-eyebrow').textContent = how.eyebrow;
+    document.getElementById('how-title').textContent = how.title;
+    const intro = document.getElementById('how-intro');
+    intro.textContent = how.intro; intro.hidden = !how.intro;
+    document.getElementById('how-steps').innerHTML = stepsHtml(how.steps);
+    const nt = document.getElementById('how-notice');
+    if (how.noticeText || how.noticeTitle) nt.innerHTML = (how.noticeTitle ? `<strong>${esc(how.noticeTitle)}</strong> ` : '') + esc(how.noticeText);
+    else nt.hidden = true;
+  } else document.getElementById('how').style.display = 'none';
 
   // „Кое да избера“ (редактира се от Админ → Настройки)
   const ch = getChoose(s);
