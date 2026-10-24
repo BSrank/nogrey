@@ -250,7 +250,8 @@
       <div class="set-group" data-group="terms" hidden>
         <div class="card" style="margin-bottom:18px">
           <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Данни на търговеца</h3><a class="btn ghost sm" href="terms.html" target="_blank">Отвори страницата ↗</a></div>
-          <p class="muted" style="font-size:.86rem;margin-top:0">Показват се като т. 1 „Търговец“. Задължителни са по закон за онлайн магазин.</p>
+          <div class="field"><label class="switch"><input type="checkbox" id="seller-enabled" onchange="toggleSeller()"> Показвай т. 1 „Търговец“ в условията</label><small>Когато е изключено, точката изчезва от страницата, а попълнените данни остават запазени тук за по-късно.</small></div>
+          <div id="seller-fields">
           <div class="row2">
             <div class="field"><label>Фирма / ЕТ</label><input id="seller-name" placeholder="напр. Нойгрей ЕООД"></div>
             <div class="field"><label>ЕИК</label><input id="seller-eik"></div>
@@ -260,10 +261,11 @@
             <div class="field"><label>Имейл</label><input id="seller-email" type="email"></div>
             <div class="field"><label>Телефон (по желание)</label><input id="seller-phone"></div>
           </div>
+          </div>
         </div>
         <div class="card">
           <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Точки от условията</h3><button class="btn ghost sm" onclick="resetTerms()">Върни текста по подразбиране</button><button class="btn ghost sm" onclick="addTerm()">+ Добави точка</button></div>
-          <p class="muted" style="font-size:.86rem;margin-top:0">Номерата се слагат сами (след „1. Търговец“). В текста: <b>празен ред</b> = нов абзац · ред, започващ с <b>„- “</b> = точка от списък · <b>**текст**</b> = удебелено.</p>
+          <p class="muted" style="font-size:.86rem;margin-top:0">Номерата се слагат сами. В текста: <b>празен ред</b> = нов абзац · ред, започващ с <b>„- “</b> = точка от списък · <b>**текст**</b> = удебелено.</p>
           <div class="row2">
             <div class="field"><label>Заглавие на страницата</label><input id="terms-title"></div>
             <div class="field"><label>Последна актуализация</label><input id="terms-updated" placeholder="напр. октомври 2026 г."></div>
@@ -930,11 +932,12 @@ function fillSettings() {
   renderChoose();
   const seller = s.seller || {};
   SELLER_FIELDS.forEach(k => { document.getElementById('seller-' + k).value = seller[k] || ''; });
+  document.getElementById('seller-enabled').checked = seller.enabled !== false;
   const terms = getTerms(s);
   document.getElementById('terms-title').value = terms.title;
   document.getElementById('terms-updated').value = terms.updated;
   TERMS = JSON.parse(JSON.stringify(terms.sections));
-  renderTerms();
+  toggleSeller(); // рисува и точките
   FAQ = JSON.parse(JSON.stringify(getFaq(s)));
   renderFaq();
   renderHeroPreview();
@@ -1118,7 +1121,7 @@ function renderTerms() {
   box.innerHTML = TERMS.length ? TERMS.map((x, i) => `
     <div class="sec-block">
       <div class="promo-row" style="margin-bottom:8px">
-        <span class="muted" style="align-self:center;font-weight:800;min-width:28px">${i + 2}.</span>
+        <span class="muted" style="align-self:center;font-weight:800;min-width:28px">${i + (sellerOn() ? 2 : 1)}.</span>
         <input placeholder="Заглавие на точката" value="${esc(x.title)}" oninput="TERMS[${i}].title=this.value" style="font-weight:700">
       </div>
       <textarea rows="${Math.min(10, Math.max(3, String(x.body || '').split('\n').length + 1))}" placeholder="Текст" oninput="TERMS[${i}].body=this.value">${esc(x.body)}</textarea>
@@ -1128,6 +1131,14 @@ function renderTerms() {
         <button type="button" class="btn danger ghost sm" onclick="if(confirm('Да махна ли тази точка?')){TERMS.splice(${i},1);renderTerms()}">Махни</button>
       </div>
     </div>`).join('') : '<p class="muted">Няма точки — ще се показва само „1. Търговец“.</p>';
+}
+function sellerOn() { const el = document.getElementById('seller-enabled'); return !el || el.checked; }
+function toggleSeller() {
+  const on = sellerOn();
+  const box = document.getElementById('seller-fields');
+  box.style.opacity = on ? '' : '.45';
+  box.querySelectorAll('input').forEach(x => { x.disabled = !on; });
+  renderTerms(); // преномериране
 }
 function addTerm() { TERMS.push({ title: '', body: '' }); renderTerms(); }
 function moveTerm(i, d) {
@@ -1170,7 +1181,7 @@ function saveSettings() {
     title: document.getElementById('ch-title').value.trim(),
     items: CHOOSE.map(x => ({ title: (x.title || '').trim(), text: (x.text || '').trim(), linkText: (x.linkText || '').trim(), cat: x.cat || '' })).filter(x => x.title || x.text)
   };
-  s.seller = {};
+  s.seller = { enabled: sellerOn() };
   SELLER_FIELDS.forEach(k => { s.seller[k] = document.getElementById('seller-' + k).value.trim(); });
   s.terms = {
     title: document.getElementById('terms-title').value.trim(),
