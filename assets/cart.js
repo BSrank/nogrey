@@ -292,6 +292,29 @@ function faqHtml(list) {
   return list.map(x => `<details><summary>${esc(x.q)}</summary><ul><li>${esc(x.a).replace(/\n/g, '<br>')}</li></ul></details>`).join('');
 }
 
+/* ---------- „Как действа“ (settings.how) ---------- */
+const DEFAULT_HOW = {
+  eyebrow: 'Как действа',
+  title: 'Три стъпки под душа',
+  intro: 'Оцветяващият шампоан съдържа пигменти, които се натрупват постепенно по бялата коса. Колкото по-дълго действа, толкова по-наситен е цветът.',
+  steps: [
+    { title: 'Намокрете и нанесете', text: 'Нанесете върху мократа коса или брада и разпределете равномерно, без да пропускате корените.' },
+    { title: 'Оставете 5–10 минути', text: 'Докато се къпете, пигментът действа. За по-тъмен резултат — по-дълго.' },
+    { title: 'Изплакнете обилно', text: 'Изплакнете до бистра вода. Повтаряйте 2–3 пъти седмично за поддържане на цвета.' }
+  ],
+  noticeTitle: 'Тест за чувствителност:',
+  noticeText: '48 часа преди първата употреба нанесете малко количество зад ухото. При зачервяване или сърбеж не използвайте продукта.'
+};
+function getHow(s) {
+  const h = s && s.how;
+  if (!h || !Array.isArray(h.steps)) return DEFAULT_HOW;
+  return { eyebrow: h.eyebrow || '', title: h.title || '', intro: h.intro || '', noticeTitle: h.noticeTitle || '', noticeText: h.noticeText || '',
+    steps: h.steps.filter(x => x && (x.title || x.text)) };
+}
+function stepsHtml(steps) {
+  return steps.map((x, i) => `<div class="card"><div class="step-num">${String(i + 1).padStart(2, '0')}</div><h3>${esc(x.title)}</h3><p class="muted">${esc(x.text)}</p></div>`).join('');
+}
+
 /* ---------- „Кое да избера“ (settings.choose) ---------- */
 const DEFAULT_CHOOSE = {
   eyebrow: 'Кое да избера',
