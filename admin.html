@@ -54,6 +54,9 @@
   @media (max-width: 860px) { .settings-grid { grid-template-columns: 1fr; } }
   .card h3 { margin-bottom: 14px; }
   .hero-prev { width: 100%; aspect-ratio: 16/7; border-radius: 10px; background: var(--sage) center/cover no-repeat; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); font-size: .9rem; margin-bottom: 12px; }
+  .set-nav { position: sticky; top: 0; z-index: 5; background: #f4f6f4; padding: 10px 0; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 14px; }
+  .set-nav .chip { white-space: nowrap; flex: none; }
+  .set-group[hidden] { display: none !important; }
   .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
   .img-slot { position: relative; border: 1px solid var(--line); border-radius: 10px; background: #fafbfa; overflow: hidden; display: flex; flex-direction: column; margin: 0; font-weight: 400; }
   .img-slot img, .img-empty { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--sage); display: block; }
@@ -138,19 +141,50 @@
     <!-- Настройки -->
     <section class="panel" id="tab-settings">
       <div class="toolbar"><h2>Настройки</h2><button class="btn sm" onclick="saveSettings()">Запази настройките</button></div>
-      <div class="settings-grid">
+      <div class="filters set-nav" id="set-nav">
+        <button class="chip active" data-group="general">Общи</button>
+        <button class="chip" data-group="hero">Начало: горна част</button>
+        <button class="chip" data-group="benefits">Предимства</button>
+        <button class="chip" data-group="how">Как действа</button>
+        <button class="chip" data-group="choose">Кое да избера</button>
+        <button class="chip" data-group="faq">Въпроси</button>
+        <button class="chip" data-group="reviews">Ревюта и награди</button>
+        <button class="chip" data-group="password">Парола</button>
+      </div>
+      <p class="muted" style="font-size:.84rem;margin:-14px 0 18px">Секциите на началната страница са подредени както на сайта. „Запази настройките“ записва всички секции наведнъж.</p>
+
+      <!-- Общи -->
+      <div class="settings-grid set-group" data-group="general">
         <div class="card">
           <h3>Магазин</h3>
           <div class="field"><label>Име на магазина</label><input id="s-storeName"></div>
           <div class="field"><label>Домейн</label><input id="s-siteDomain"></div>
-          <div class="field"><label>Лента с обявление (горе)</label><input id="s-announcement"></div>
-          <div class="field"><label>Заглавие на началната страница</label><input id="s-heroTitle"></div>
-          <div class="field"><label>Подзаглавие</label><textarea id="s-heroSubtitle" rows="3"></textarea></div>
+          <div class="field"><label>Лента с обявление (най-горе)</label><input id="s-announcement"></div>
           <div class="field"><label>Безплатна доставка над (€, 0 = изключено)</label><input id="s-freeShippingThreshold" type="number" min="0" step="1"></div>
         </div>
+        <div>
+          <div class="card" style="margin-bottom:18px">
+            <h3>Контакт</h3>
+            <div class="field"><label>Начин на контакт</label><select id="s-contactMode"><option value="form">Форма на сайта</option><option value="phone">Телефон</option></select></div>
+            <div class="field"><label>Телефон</label><input id="s-phone" placeholder="0888 123 456"></div>
+          </div>
+          <div class="card">
+            <h3>Бадж-ове</h3>
+            <div class="field"><label class="switch"><input type="checkbox" id="s-showNewListings"> Показвай „Ново“ на новите обяви</label></div>
+            <div class="field"><label class="switch"><input type="checkbox" id="u-enabled"> „Ограничено количество“ (Само X бр. налични)</label><small>Само визуално. Броят се задава за всеки продукт в редактора му.</small></div>
+          </div>
+        </div>
+      </div>
 
+      <!-- Начало: горна част -->
+      <div class="settings-grid set-group" data-group="hero" hidden>
         <div class="card">
-          <h3>Фон на началната страница</h3>
+          <h3>Текст</h3>
+          <div class="field"><label>Заглавие</label><input id="s-heroTitle"></div>
+          <div class="field"><label>Подзаглавие</label><textarea id="s-heroSubtitle" rows="4"></textarea></div>
+        </div>
+        <div class="card">
+          <h3>Фон (снимка)</h3>
           <div class="hero-prev" id="hero-prev">Няма снимка — използва се зеленият градиент</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <label class="btn sm" style="margin:0">Качи снимка<input type="file" id="hero-file" accept="image/jpeg,image/png,image/webp" style="display:none"></label>
@@ -159,15 +193,40 @@
           <p class="muted" style="font-size:.84rem;margin-top:10px">Препоръка: хоризонтална снимка поне 1920×1080, до ~600 KB. Върху нея се слага тъмен слой, за да се чете текстът. „Премахни“ само маха снимката от сайта — файлът остава в repo-то.</p>
           <div id="hero-status"></div>
         </div>
+      </div>
 
-        <div class="card" style="grid-column:1/-1">
-          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Предимства на началната страница</h3><button class="btn ghost sm" onclick="addBenefit()">+ Добави</button></div>
-          <p class="muted" style="font-size:.86rem;margin-top:0">Картите с номера под заглавието на началната страница. Най-добре изглеждат 4 (или 2, 3, 8). Без нито една — секцията се скрива.</p>
+      <!-- Предимства -->
+      <div class="set-group" data-group="benefits" hidden>
+        <div class="card">
+          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Предимства</h3><button class="btn ghost sm" onclick="addBenefit()">+ Добави</button></div>
+          <p class="muted" style="font-size:.86rem;margin-top:0">Картите с номера под горната част на началната страница. Най-добре изглеждат 4 (или 2, 3, 8). Без нито една — секцията се скрива.</p>
           <div id="benefits-edit" class="settings-grid"></div>
         </div>
+      </div>
 
-        <div class="card" style="grid-column:1/-1">
-          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Секция „Кое да избера“</h3><button class="btn ghost sm" onclick="addChoose()">+ Добави карта</button></div>
+      <!-- Как действа -->
+      <div class="set-group" data-group="how" hidden>
+        <div class="card">
+          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Как действа</h3><button class="btn ghost sm" onclick="addStep()">+ Добави стъпка</button></div>
+          <p class="muted" style="font-size:.86rem;margin-top:0">Стъпките за употреба. Номерата 01, 02, 03… се слагат сами. Без нито една стъпка — секцията се скрива.</p>
+          <div class="row2">
+            <div class="field"><label>Малък надпис отгоре</label><input id="how-eyebrow" placeholder="Как действа"></div>
+            <div class="field"><label>Заглавие</label><input id="how-title" placeholder="Три стъпки под душа"></div>
+          </div>
+          <div class="field"><label>Текст под заглавието</label><textarea id="how-intro" rows="2"></textarea></div>
+          <div id="steps-edit" class="settings-grid" style="margin-bottom:18px"></div>
+          <div class="sec-block">
+            <label style="margin-bottom:8px">Каре с предупреждение (под стъпките)</label>
+            <input id="how-noticeTitle" placeholder="Удебелено начало, напр. Тест за чувствителност:" style="margin-bottom:8px;font-weight:700">
+            <textarea id="how-noticeText" rows="2" placeholder="Текст (празно = карето не се показва)"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Кое да избера -->
+      <div class="set-group" data-group="choose" hidden>
+        <div class="card">
+          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Кое да избера</h3><button class="btn ghost sm" onclick="addChoose()">+ Добави карта</button></div>
           <p class="muted" style="font-size:.86rem;margin-top:0">Картите на светлозелен фон на началната страница. Без нито една карта — секцията се скрива.</p>
           <div class="row2">
             <div class="field"><label>Малък надпис отгоре</label><input id="ch-eyebrow" placeholder="Кое да избера"></div>
@@ -175,38 +234,34 @@
           </div>
           <div id="choose-edit" class="settings-grid"></div>
         </div>
+      </div>
 
-        <div class="card" style="grid-column:1/-1">
+      <!-- Въпроси -->
+      <div class="set-group" data-group="faq" hidden>
+        <div class="card">
           <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Често задавани въпроси</h3><button class="btn ghost sm" onclick="addFaq()">+ Добави въпрос</button></div>
           <p class="muted" style="font-size:.86rem;margin-top:0">Показват се най-долу на началната страница. Без нито един — секцията се скрива.</p>
           <div id="faq-edit"></div>
         </div>
+      </div>
 
-        <div class="card">
-          <h3>Контакт</h3>
-          <div class="field"><label>Начин на контакт</label><select id="s-contactMode"><option value="form">Форма на сайта</option><option value="phone">Телефон</option></select></div>
-          <div class="field"><label>Телефон</label><input id="s-phone" placeholder="0888 123 456"></div>
-        </div>
-
-        <div class="card">
-          <h3>Бадж-ове</h3>
-          <div class="field"><label class="switch"><input type="checkbox" id="s-showNewListings"> Показвай „Ново“ на новите обяви</label></div>
-          <div class="field"><label class="switch"><input type="checkbox" id="u-enabled"> „Ограничено количество“ (Само X бр. налични)</label><small>Само визуално. Броят се задава за всеки продукт в редактора му.</small></div>
-        </div>
-
+      <!-- Ревюта и награди -->
+      <div class="settings-grid set-group" data-group="reviews" hidden>
         <div class="card">
           <h3>Награди за ревюта</h3>
           <div class="field"><label>Шанс за промо код вместо подарък (%)</label><input id="s-rewardDiscountChance" type="number" min="0" max="100"></div>
           <div class="field"><label>Размер на отстъпката (%)</label><input id="s-rewardDiscountPercent" type="number" min="1" max="90"></div>
         </div>
-
         <div class="card">
           <h3>Показване на ревюта</h3>
           <div class="field"><label class="switch"><input type="checkbox" id="s-showManualReviews"> Моите ревюта (таб „Ревюта“)</label></div>
           <div class="field"><label class="switch"><input type="checkbox" id="s-showClientReviews"> Одобрени клиентски ревюта</label></div>
         </div>
+      </div>
 
-        <div class="card" style="grid-column:1/-1">
+      <!-- Парола -->
+      <div class="set-group" data-group="password" hidden>
+        <div class="card">
           <h3>Смяна на паролата</h3>
           <p class="muted" style="font-size:.88rem">Въведи нова парола — генерира се SHA-256 хеш. Сложи го на <b>две</b> места: <code>ADMIN_PASSWORD_HASH</code> в admin.html и в Code.gs (после нов Deploy на Apps Script).</p>
           <div class="promo-row"><input id="new-pass" type="text" placeholder="Нова парола"><button class="btn ghost sm" onclick="genHash()">Генерирай</button></div>
@@ -836,6 +891,10 @@ function fillSettings() {
   renderManual();
   BENEFITS = JSON.parse(JSON.stringify(getBenefits(s)));
   renderBenefits();
+  const how = getHow(s);
+  HOW_FIELDS.forEach(k => { document.getElementById('how-' + k).value = how[k] || ''; });
+  STEPS = JSON.parse(JSON.stringify(how.steps));
+  renderSteps();
   const ch = getChoose(s);
   document.getElementById('ch-eyebrow').value = ch.eyebrow;
   document.getElementById('ch-title').value = ch.title;
@@ -951,6 +1010,44 @@ function moveBenefit(i, d) {
   [BENEFITS[i], BENEFITS[j]] = [BENEFITS[j], BENEFITS[i]]; renderBenefits();
 }
 
+/* ======= Подсекции в Настройки ======= */
+document.getElementById('set-nav').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  showSetGroup(b.dataset.group);
+});
+function showSetGroup(g) {
+  document.querySelectorAll('#set-nav .chip').forEach(x => x.classList.toggle('active', x.dataset.group === g));
+  document.querySelectorAll('.set-group').forEach(x => { x.hidden = x.dataset.group !== g; });
+  try { sessionStorage.setItem('nogrey_set_group', g); } catch (e) {}
+}
+(function () { try { const g = sessionStorage.getItem('nogrey_set_group'); if (g && document.querySelector(`.set-group[data-group="${g}"]`)) showSetGroup(g); } catch (e) {} })();
+
+/* ======= Как действа ======= */
+let STEPS = [];
+function renderSteps() {
+  const box = document.getElementById('steps-edit');
+  box.style.gridTemplateColumns = STEPS.length ? '' : '1fr';
+  box.innerHTML = STEPS.length ? STEPS.map((x, i) => `
+    <div class="sec-block" style="margin:0">
+      <div class="promo-row" style="margin-bottom:8px">
+        <span class="step-num" style="font-size:1.5rem;margin:0;flex:none;align-self:center">${String(i + 1).padStart(2, '0')}</span>
+        <input placeholder="Заглавие на стъпката" value="${esc(x.title)}" oninput="STEPS[${i}].title=this.value" style="font-weight:700">
+      </div>
+      <textarea rows="3" placeholder="Текст" oninput="STEPS[${i}].text=this.value">${esc(x.text)}</textarea>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" class="btn ghost sm" onclick="moveStep(${i},-1)" ${i === 0 ? 'disabled' : ''}>←</button>
+        <button type="button" class="btn ghost sm" onclick="moveStep(${i},1)" ${i === STEPS.length - 1 ? 'disabled' : ''}>→</button>
+        <button type="button" class="btn danger ghost sm" onclick="STEPS.splice(${i},1);renderSteps()">Махни</button>
+      </div>
+    </div>`).join('') : '<p class="muted">Няма стъпки — секцията няма да се показва.</p>';
+}
+function addStep() { STEPS.push({ title: '', text: '' }); renderSteps(); }
+function moveStep(i, d) {
+  const j = i + d; if (j < 0 || j >= STEPS.length) return;
+  [STEPS[i], STEPS[j]] = [STEPS[j], STEPS[i]]; renderSteps();
+}
+const HOW_FIELDS = ['eyebrow', 'title', 'intro', 'noticeTitle', 'noticeText'];
+
 /* ======= „Кое да избера“ ======= */
 let CHOOSE = [];
 const CHOOSE_LINKS = [['shampoo', 'Шампоани'], ['serum', 'Серуми'], ['set', 'Комплекти'], ['all', 'Всички продукти'], ['', 'Без линк']];
@@ -1001,6 +1098,8 @@ function moveFaq(i, d) {
 
 function saveSettings() {
   const s = DATA.settings;
+  s.how = { steps: STEPS.map(x => ({ title: (x.title || '').trim(), text: (x.text || '').trim() })).filter(x => x.title || x.text) };
+  HOW_FIELDS.forEach(k => { s.how[k] = document.getElementById('how-' + k).value.trim(); });
   s.choose = {
     eyebrow: document.getElementById('ch-eyebrow').value.trim(),
     title: document.getElementById('ch-title').value.trim(),
