@@ -11,7 +11,7 @@
 </head>
 <body>
 <div id="site-header"></div>
-<main class="prose">
+<main class="prose" id="terms">
   <div class="eyebrow">Информация</div>
   <h1 style="font-size:2.2rem">Условия за ползване и наложен платеж</h1>
   <p class="muted">Последна актуализация: октомври 2026 г.</p>
@@ -67,7 +67,22 @@
   <p>Споровете се решават по взаимно съгласие, а при невъзможност — от компетентния български съд. Можете да се обърнете и към Комисията за защита на потребителите (kzp.bg).</p>
 </main>
 <div id="site-footer"></div>
+<script src="assets/config.js"></script>
 <script src="assets/cart.js"></script>
-<script>initPage('');</script>
+<script src="assets/terms-default.js"></script>
+<script>
+(async function () {
+  const store = await initPage('');
+  const s = store.settings, t = getTerms(s);
+  // „Търговец“ е винаги т. 1, после точките от Админ → Настройки → Условия
+  const sections = [{ title: 'Търговец', html: sellerHtml(s) }].concat(t.sections.map(x => ({ title: x.title, html: termsBodyHtml(x.body) })));
+  document.getElementById('terms').innerHTML = `
+    <div class="eyebrow">Информация</div>
+    <h1 style="font-size:2.2rem">${esc(t.title || 'Условия за ползване')}</h1>
+    ${t.updated ? `<p class="muted">Последна актуализация: ${esc(t.updated)}</p>` : ''}
+    ${sections.map((x, i) => `<h2>${i + 1}. ${esc(x.title)}</h2>${x.html}`).join('')}`;
+  if (t.title) document.title = t.title + ' — ' + (s.storeName || 'NoGrey');
+})();
+</script>
 </body>
 </html>
