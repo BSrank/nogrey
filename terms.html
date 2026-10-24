@@ -74,8 +74,9 @@
 (async function () {
   const store = await initPage('');
   const s = store.settings, t = getTerms(s);
-  // „Търговец“ е винаги т. 1, после точките от Админ → Настройки → Условия
-  const sections = [{ title: 'Търговец', html: sellerHtml(s) }].concat(t.sections.map(x => ({ title: x.title, html: termsBodyHtml(x.body) })));
+  // „Търговец“ е т. 1 (ако е включен), после точките от Админ → Настройки → Условия
+  const showSeller = !(s.seller && s.seller.enabled === false);
+  const sections = (showSeller ? [{ title: 'Търговец', html: sellerHtml(s) }] : []).concat(t.sections.map(x => ({ title: x.title, html: termsBodyHtml(x.body) })));
   document.getElementById('terms').innerHTML = `
     <div class="eyebrow">Информация</div>
     <h1 style="font-size:2.2rem">${esc(t.title || 'Условия за ползване')}</h1>
