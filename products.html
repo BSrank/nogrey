@@ -3,8 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Продукти — NoGrey</title>
-<meta name="description" content="Всички оцветяващи шампоани и серуми против бяла коса и брада на NoGrey.">
+<title>Продукт — NoGrey</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -12,49 +11,79 @@
 </head>
 <body>
 <div id="site-header"></div>
-
-<section class="section" style="padding-top:44px">
-  <div class="container">
-    <div class="section-head">
-      <div class="eyebrow">Магазин</div>
-      <h1 style="font-size:clamp(1.9rem,4vw,2.6rem)">Всички продукти</h1>
-      <p class="muted">Оцветяващи шампоани за коса и брада и серуми за грижа от корена.</p>
-    </div>
-    <div class="filters" id="filters">
-      <button class="chip" data-cat="">Всички</button>
-      <button class="chip" data-cat="shampoo">Шампоани</button>
-      <button class="chip" data-cat="serum">Серуми</button>
-      <button class="chip" data-cat="set">Комплекти</button>
-    </div>
-    <div class="products-grid" id="grid"><div class="spinner"></div></div>
-  </div>
-</section>
-
+<main class="container" id="pdp"><div class="spinner" style="margin:80px auto"></div></main>
 <div id="site-footer"></div>
+<script src="assets/config.js"></script>
 <script src="assets/cart.js"></script>
 <script>
 (async function () {
   await initPage('products');
-  const all = activeProducts();
-  // Показваме само филтрите, за които има продукти
-  document.querySelectorAll('#filters .chip').forEach(b => {
-    if (b.dataset.cat && !all.some(p => p.category === b.dataset.cat)) b.style.display = 'none';
-  });
-  let cat = qs('cat') || '';
-  function render() {
-    document.querySelectorAll('#filters .chip').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
-    const list = all.filter(p => !cat || p.category === cat);
-    document.getElementById('grid').innerHTML = list.length
-      ? list.map(productCard).join('')
-      : '<div class="empty-state" style="grid-column:1/-1">Няма продукти в тази категория.</div>';
+  const root = document.getElementById('pdp');
+  const p = findProduct(qs('id'));
+  if (!p || p.active === false) {
+    root.innerHTML = '<div class="empty-state" style="padding:80px 0"><h2>Продуктът не е наличен</h2><a class="btn" href="products.html">Към всички продукти</a></div>';
+    return;
   }
-  document.getElementById('filters').addEventListener('click', e => {
-    const b = e.target.closest('.chip'); if (!b) return;
-    cat = b.dataset.cat;
-    history.replaceState(null, '', cat ? '?cat=' + cat : 'products.html');
-    render();
-  });
-  render();
+  document.title = p.name + ' — ' + (STORE.settings.storeName || 'NoGrey');
+  const u = urgencyCount(p.id);
+  const sale = Number(p.comparePrice) > Number(p.price);
+  const sections = (p.sections || []).filter(s => s && s.title);
+
+  root.innerHTML = `
+    <div class="pdp">
+      <div>
+        <div class="gallery-main"><img id="main-img" src="${esc(mainImage(p))}" alt="${esc(p.name)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"></div>
+        <div class="thumbs" id="thumbs"></div>
+      </div>
+      <div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          ${p.category ? `<span class="eyebrow">${esc(CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
+          ${showNewBadge(p) ? '<span class="badge">Ново</span>' : ''}
+        </div>
+        <h1 style="font-size:clamp(1.8rem,4vw,2.5rem)">${esc(p.name)}</h1>
+        <div class="price">
+          <span class="now">${eur(p.price)}</span>
+          <span class="bgn">${bgn(productBgn(p))}</span>
+          ${sale ? `<span class="old">${eur(p.comparePrice)}${Number(p.comparePriceBgn) > 0 ? ' / ' + bgn(p.comparePriceBgn) : ''}</span><span class="badge sale">−${Math.round((1 - p.price / p.comparePrice) * 100)}%</span>` : ''}
+        </div>
+        ${u ? `<div class="badge urgent" style="display:inline-block;margin-top:12px;font-size:.88rem">Само ${u} бройки налични</div>` : ''}
+        ${(p.previewFeatures || []).length ? `<ul class="trust-list">${p.previewFeatures.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+        <div class="buy-row">
+          <div class="qty"><button id="q-minus" aria-label="По-малко">−</button><input id="q" value="1" inputmode="numeric" aria-label="Количество"><button id="q-plus" aria-label="Повече">+</button></div>
+          <button class="btn" id="add">Добави в количката</button>
+        </div>
+        <button class="btn ghost block" id="buy-now">Купи сега</button>
+        <ul class="trust-list" style="margin-top:22px">
+          <li>Плащане с наложен платеж при получаване</li>
+          <li>Доставка до офис на Econt в цяла България</li>
+        </ul>
+        ${sections.length ? `<div class="acc">${sections.map((s, i) => `
+          <details ${i === 0 ? 'open' : ''}><summary>${esc(s.title)}</summary>
+            <ul>${(s.items || []).map(it => `<li>${esc(it)}</li>`).join('')}</ul>
+          </details>`).join('')}</div>` : ''}
+      </div>
+    </div>`;
+
+  const q = document.getElementById('q');
+  const getQ = () => Math.max(1, parseInt(q.value, 10) || 1);
+  document.getElementById('q-minus').onclick = () => { q.value = Math.max(1, getQ() - 1); };
+  document.getElementById('q-plus').onclick = () => { q.value = getQ() + 1; };
+  document.getElementById('add').onclick = () => { addToCart(p.id, getQ()); openCart(); };
+  document.getElementById('buy-now').onclick = () => { addToCart(p.id, getQ()); location.href = 'checkout.html'; };
+
+  // Галерия: imageMain + {imagePrefix}.1.jpg … (паралелна проверка)
+  const imgs = await buildGallery(p);
+  const main = document.getElementById('main-img');
+  main.src = imgs[0];
+  if (imgs.length > 1) {
+    const th = document.getElementById('thumbs');
+    th.innerHTML = imgs.map((src, i) => `<button class="${i === 0 ? 'active' : ''}" data-src="${esc(src)}"><img src="${esc(src)}" alt=""></button>`).join('');
+    th.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      main.src = b.dataset.src;
+      th.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+    });
+  }
 })();
 </script>
 </body>
