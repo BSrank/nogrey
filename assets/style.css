@@ -72,6 +72,7 @@ input, select, textarea { width: 100%; font: inherit; padding: 12px 14px; border
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--sage-2); border-color: var(--green-2); }
 .field { margin-bottom: 16px; }
 .field small { color: var(--muted); font-size: .82rem; }
+.field > small { display: block; margin-top: 4px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
 .notice { padding: 14px 16px; border-radius: 10px; background: var(--sage); border: 1px solid var(--sage-2); font-size: .95rem; }
