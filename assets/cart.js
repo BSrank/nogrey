@@ -220,7 +220,7 @@ function renderChrome(active) {
           <a href="index.html" class="${active === 'home' ? 'active' : ''}">Начало</a>
           <a href="products.html" class="${active === 'products' ? 'active' : ''}">Продукти</a>
           <a href="index.html#how">Как действа</a>
-          <a href="index.html#reviews">Ревюта</a>
+          <a href="otzivi.html" class="${active === 'reviews' ? 'active' : ''}">Ревюта</a>
           <a href="index.html#contact">Контакт</a>
         </nav>
         <button class="menu-toggle" aria-label="Меню" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
@@ -248,6 +248,7 @@ function renderChrome(active) {
             <li><a href="products.html?cat=serum">Серуми</a></li>
           </ul></div>
           <div><h4>Информация</h4><ul>
+            <li><a href="otzivi.html">Отзиви от клиенти</a></li>
             <li><a href="terms.html">Условия и наложен платеж</a></li>
             <li><a href="index.html#contact">Контакт</a></li>
             ${s.contactMode === 'phone' && s.phone ? `<li><a href="tel:${esc(s.phone)}">${esc(s.phone)}</a></li>` : ''}
@@ -387,6 +388,19 @@ function reviewCard(r) {
     <div class="who">${esc(r.author || r.name || 'Клиент')}</div>
     ${meta ? `<div class="meta">${meta}</div>` : ''}
   </div>`;
+}
+
+// Всички ревюта за показване: моите (products.json) + одобрените клиентски (Google Sheet)
+async function loadAllReviews(s) {
+  let list = [];
+  if (s.showManualReviews !== false) list = list.concat((s.manualReviews || []).filter(r => r && r.text).map(r => ({ ...r, rating: Number(r.rating) || 5, photos: r.photos || [] })));
+  if (s.showClientReviews !== false && scriptReady()) {
+    try {
+      const res = await apiGet({ action: 'getReviews' });
+      if (res && res.ok) list = list.concat(res.reviews.map(r => ({ text: r.text, author: r.name, rating: Number(r.rating) || 5, verified: true, date: r.date, photos: (r.photos || []).map(id => driveImg(id)) })));
+    } catch (e) { /* бекендът не отговаря — показваме само моите */ }
+  }
+  return list;
 }
 
 function openLightbox(src) {
