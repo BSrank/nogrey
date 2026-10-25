@@ -127,11 +127,11 @@
     <!-- Ревюта -->
     <section class="panel" id="tab-reviews">
       <div class="toolbar">
-        <h2>Мои ревюта</h2>
-        <button class="btn ghost sm" onclick="addManualReview()">+ Добави ревю</button>
-        <button class="btn sm" id="mr-save" onclick="saveManualReviews()">Запази ревютата</button>
+        <h2>Мои ревюта <span class="muted" id="mr-count" style="font-size:1rem;font-family:var(--sans)"></span></h2>
+        <a class="btn ghost sm" href="otzivi.html" target="_blank">Виж на сайта ↗</a>
+        <button class="btn sm" onclick="addManualReview()">+ Добави ревю</button>
       </div>
-      <p class="muted" style="font-size:.88rem;margin-top:-6px">Ревюта, които въвеждаш сам — напр. отзиви от реални клиенти, получени във Facebook, Viber или по телефона. Показват се на началната страница.</p>
+      <p class="muted" style="font-size:.88rem;margin-top:-6px">Ревюта, които въвеждаш сам — напр. отзиви от реални клиенти, получени във Facebook, Viber или по телефона. Показват се на началната страница и в „Отзиви“.</p>
       <div id="manual-reviews"></div>
       <div class="toolbar" style="margin-top:40px"><h2>От клиенти</h2><button class="btn ghost sm" onclick="loadReviews()">Обнови</button></div>
       <p class="muted" style="font-size:.88rem;margin-top:-6px">Оставени през линка от „Покана за ревю“. Появяват се на сайта след одобрение.</p>
@@ -955,78 +955,146 @@ function fillSettings() {
 const MR_MAX_PHOTOS = 3;
 let MANUAL_ORIG_PHOTOS = [];
 let MR_SAVING = false;
+let MR_EDIT = null;      // индекс на ревюто, което се редактира (null = никое)
+let MR_DRAFT = null;     // копие за редакция — оригиналът не се пипа до „Запази“
+let MR_IS_NEW = false;
 function mrPhotoSrc(p) { return typeof p === 'string' ? rawUrl(p) : p.url; }
+
 function renderManual() {
   const box = document.getElementById('manual-reviews');
+  const cnt = document.getElementById('mr-count');
+  const saved = MANUAL.length - (MR_IS_NEW ? 1 : 0);
+  if (cnt) cnt.textContent = saved ? `(${saved})` : '';
   if (!MANUAL.length) { box.innerHTML = '<div class="card empty-state">Още няма. Натисни „+ Добави ревю“.</div>'; return; }
-  const pending = MANUAL.some(r => (r.photos || []).some(p => typeof p !== 'string'));
-  box.innerHTML = (pending ? '<p style="font-size:.88rem;color:var(--warn)">Има незапазени снимки — натисни „Запази ревютата“.</p>' : '')
-    + '<div class="reviews-grid">' + MANUAL.map((r, i) => {
-      const photos = r.photos || [];
-      return `
-      <div class="review">
-        <div class="row2" style="gap:8px;margin-bottom:8px">
-          <input placeholder="Име (напр. Иван П.)" value="${esc(r.author)}" oninput="MANUAL[${i}].author=this.value">
-          <select onchange="MANUAL[${i}].rating=Number(this.value)" aria-label="Оценка">${[5, 4, 3, 2, 1].map(n => `<option value="${n}" ${(Number(r.rating) || 5) === n ? 'selected' : ''}>${'★'.repeat(n)}${'☆'.repeat(5 - n)}</option>`).join('')}</select>
-        </div>
-        <textarea rows="3" placeholder="Текст на ревюто" oninput="MANUAL[${i}].text=this.value" style="margin-bottom:8px">${esc(r.text)}</textarea>
-        <input placeholder="Куриер (по желание) → „Доставено с …“" value="${esc(r.courier)}" oninput="MANUAL[${i}].courier=this.value" style="margin-bottom:10px">
-        <div class="photo-picker">
-          ${photos.map((p, k) => `<div class="ph"><img src="${esc(mrPhotoSrc(p))}" alt="" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"><button type="button" onclick="removeManualPhoto(${i},${k})" aria-label="Махни">×</button></div>`).join('')}
-          ${photos.length < MR_MAX_PHOTOS ? `<label class="add">+ Снимка<input type="file" accept="image/*" multiple hidden onchange="addManualPhotos(this,${i})"></label>` : ''}
-        </div>
-        <button class="btn danger ghost sm" style="margin-top:12px" onclick="removeManual(${i})">Изтрий ревюто</button>
-      </div>`;
-    }).join('') + '</div>';
+  box.innerHTML = '<div class="reviews-grid">' + MANUAL.map((r, i) => i === MR_EDIT ? mrEditHtml(i) : mrViewHtml(r, i)).join('') + '</div>';
 }
-function addManualReview() { MANUAL.unshift({ text: '', author: '', courier: '', rating: 5, photos: [] }); renderManual(); }
-function removeManual(i) { if (!confirm('Да изтрия ли това ревю?')) return; MANUAL.splice(i, 1); renderManual(); }
-function removeManualPhoto(i, k) { MANUAL[i].photos.splice(k, 1); renderManual(); }
-async function addManualPhotos(input, i) {
-  const r = MANUAL[i]; r.photos = r.photos || [];
-  const files = [...input.files].slice(0, MR_MAX_PHOTOS - r.photos.length); input.value = '';
+
+// Изглед като на сайта + Редактирай / Изтрий
+function mrViewHtml(r, i) {
+  const photos = (r.photos || []).map(mrPhotoSrc);
+  const busy = MR_EDIT !== null || MR_SAVING;
+  return `
+    <div class="review" style="${busy ? 'opacity:.55' : ''}">
+      <div class="stars">${starStr(r.rating || 5)}</div>
+      <p style="margin:10px 0 0">${esc(r.text)}</p>
+      ${photos.length ? `<div class="review-photos">${photos.map(src => `<button type="button" onclick="openLightbox('${esc(src)}')"><img src="${esc(src)}" alt="" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"></button>`).join('')}</div>` : ''}
+      <div class="who">${esc(r.author || 'Клиент')}</div>
+      ${r.courier ? `<div class="meta">Доставено с ${esc(r.courier)}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn ghost sm" onclick="editManual(${i})" ${busy ? 'disabled' : ''}>Редактирай</button>
+        <button class="btn ghost sm" onclick="moveManual(${i},-1)" ${busy || i === 0 ? 'disabled' : ''} title="По-напред">←</button>
+        <button class="btn ghost sm" onclick="moveManual(${i},1)" ${busy || i === MANUAL.length - 1 ? 'disabled' : ''} title="По-назад">→</button>
+        <button class="btn danger ghost sm" onclick="removeManual(${i})" ${busy ? 'disabled' : ''}>Изтрий</button>
+      </div>
+    </div>`;
+}
+
+// Форма за редакция (работи върху MR_DRAFT)
+function mrEditHtml(i) {
+  const r = MR_DRAFT;
+  const photos = r.photos || [];
+  return `
+    <div class="review" style="border:2px solid var(--green)">
+      <div class="eyebrow" style="margin-bottom:10px">${MR_IS_NEW ? 'Ново ревю' : 'Редакция'}</div>
+      <div class="row2" style="gap:8px;margin-bottom:8px">
+        <input placeholder="Име (напр. Иван П.)" value="${esc(r.author)}" oninput="MR_DRAFT.author=this.value">
+        <select onchange="MR_DRAFT.rating=Number(this.value)" aria-label="Оценка">${[5, 4, 3, 2, 1].map(n => `<option value="${n}" ${(Number(r.rating) || 5) === n ? 'selected' : ''}>${'★'.repeat(n)}${'☆'.repeat(5 - n)}</option>`).join('')}</select>
+      </div>
+      <textarea id="mr-text" rows="4" placeholder="Текст на ревюто *" oninput="MR_DRAFT.text=this.value" style="margin-bottom:8px">${esc(r.text)}</textarea>
+      <input placeholder="Куриер (по желание) → „Доставено с …“" value="${esc(r.courier)}" oninput="MR_DRAFT.courier=this.value" style="margin-bottom:10px">
+      <div class="photo-picker">
+        ${photos.map((p, k) => `<div class="ph"><img src="${esc(mrPhotoSrc(p))}" alt="" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"><button type="button" onclick="MR_DRAFT.photos.splice(${k},1);renderManual()" aria-label="Махни">×</button></div>`).join('')}
+        ${photos.length < MR_MAX_PHOTOS ? `<label class="add">+ Снимка<input type="file" accept="image/*" multiple hidden onchange="addManualPhotos(this)"></label>` : ''}
+      </div>
+      <div id="mr-status"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn sm" id="mr-save" onclick="saveManualEdit()">Запази</button>
+        <button class="btn ghost sm" onclick="cancelManualEdit()">Откажи</button>
+      </div>
+    </div>`;
+}
+
+function addManualReview() {
+  if (MR_EDIT !== null || MR_SAVING) { alert('Първо запази или откажи ревюто, което редактираш.'); return; }
+  MANUAL.unshift({ text: '', author: '', courier: '', rating: 5, photos: [] });
+  MR_IS_NEW = true; MR_EDIT = 0; MR_DRAFT = JSON.parse(JSON.stringify(MANUAL[0]));
+  renderManual();
+  const t = document.getElementById('mr-text'); if (t) t.focus();
+}
+function editManual(i) {
+  if (MR_EDIT !== null || MR_SAVING) return;
+  MR_IS_NEW = false; MR_EDIT = i; MR_DRAFT = JSON.parse(JSON.stringify(MANUAL[i]));
+  MR_DRAFT.photos = MR_DRAFT.photos || [];
+  renderManual();
+}
+function cancelManualEdit() {
+  if (MR_SAVING) return;
+  if (MR_IS_NEW) MANUAL.splice(MR_EDIT, 1);
+  MR_EDIT = null; MR_DRAFT = null; MR_IS_NEW = false;
+  renderManual();
+}
+async function addManualPhotos(input) {
+  const files = [...input.files].slice(0, MR_MAX_PHOTOS - MR_DRAFT.photos.length); input.value = '';
   for (const f of files) {
-    try { r.photos.push(await fileToJpeg(f, 1200, 0.82)); }
+    try { MR_DRAFT.photos.push(await fileToJpeg(f, 1200, 0.82)); }
     catch (err) { alert(err.message); }
   }
   renderManual();
 }
-async function saveManualReviews() {
+async function saveManualEdit() {
   if (MR_SAVING) return;
+  if (!(MR_DRAFT.text || '').trim()) { document.getElementById('mr-status').innerHTML = '<div class="notice error" style="margin-top:10px">Напиши текст на ревюто.</div>'; return; }
   const btn = document.getElementById('mr-save');
   MR_SAVING = true; btn.disabled = true;
   try {
     await saveChain; // без паралелни commit-и
     const ts = Date.now().toString(36);
     let n = 0;
-    for (const r of MANUAL) {
-      r.photos = r.photos || [];
-      for (let k = 0; k < r.photos.length; k++) {
-        if (typeof r.photos[k] === 'string') continue;
-        const path = `uploads/reviews/${ts}-${++n}.jpg`;
-        btn.textContent = `Качване на снимка ${n}…`;
-        await ghPutRetry(path, r.photos[k].b64, 'Снимка към ревю');
-        r.photos[k] = path;
-      }
+    for (let k = 0; k < MR_DRAFT.photos.length; k++) {
+      if (typeof MR_DRAFT.photos[k] === 'string') continue;
+      const path = `uploads/reviews/${ts}-${++n}.jpg`;
+      btn.textContent = `Качване на снимка ${n}…`;
+      await ghPutRetry(path, MR_DRAFT.photos[k].b64, 'Снимка към ревю');
+      MR_DRAFT.photos[k] = path;
     }
   } catch (err) {
-    alert('Грешка при качване: ' + err.message);
-    MR_SAVING = false; btn.disabled = false; btn.textContent = 'Запази ревютата'; renderManual();
+    MR_SAVING = false; btn.disabled = false; btn.textContent = 'Запази';
+    document.getElementById('mr-status').innerHTML = `<div class="notice error" style="margin-top:10px">Грешка при качване: ${esc(err.message)}</div>`;
     return;
   }
+  MANUAL[MR_EDIT] = {
+    text: MR_DRAFT.text.trim(), author: (MR_DRAFT.author || '').trim(), courier: (MR_DRAFT.courier || '').trim(),
+    rating: Number(MR_DRAFT.rating) || 5, photos: MR_DRAFT.photos.filter(p => typeof p === 'string')
+  };
+  MR_EDIT = null; MR_DRAFT = null; MR_IS_NEW = false;
+  btn.textContent = 'Запазване…';
+  await persistManual('Ревю');
+}
+function moveManual(i, d) {
+  const j = i + d; if (j < 0 || j >= MANUAL.length || MR_EDIT !== null) return;
+  [MANUAL[i], MANUAL[j]] = [MANUAL[j], MANUAL[i]];
+  persistManual('Подредба на ревюта');
+}
+function removeManual(i) {
+  if (MR_EDIT !== null) return;
+  if (!confirm('Да изтрия ли това ревю? Ще изчезне и от сайта.')) return;
+  MANUAL.splice(i, 1);
+  persistManual('Изтрито ревю');
+}
+// Записва MANUAL в products.json и чисти неизползваните снимки
+async function persistManual(message) {
+  MR_SAVING = true; renderManual();
   DATA.settings.manualReviews = MANUAL.filter(r => (r.text || '').trim()).map(r => ({
     text: r.text.trim(), author: (r.author || '').trim(), courier: (r.courier || '').trim(),
     rating: Number(r.rating) || 5, photos: (r.photos || []).filter(p => typeof p === 'string')
   }));
   const keep = new Set(DATA.settings.manualReviews.flatMap(r => r.photos));
   const orphans = MANUAL_ORIG_PHOTOS.filter(p => !keep.has(p) && p.startsWith('uploads/reviews/'));
-  btn.textContent = 'Запазване…';
-  const ok = await queueGitHubSave('Ревюта');
-  MR_SAVING = false; btn.disabled = false; btn.textContent = 'Запази ревютата';
-  renderManual();
+  const ok = await queueGitHubSave(message);
+  MR_SAVING = false; renderManual();
   if (!ok) return;
   MANUAL_ORIG_PHOTOS = [...keep];
-  toast('Ревютата са запазени');
+  toast('Запазено — на сайта до ~1 минута');
   if (orphans.length) saveChain = saveChain.then(async () => {
     for (const x of orphans) { try { await ghDeleteFile(x, 'Премахната снимка от ревю'); } catch (err) {} }
     return true;
