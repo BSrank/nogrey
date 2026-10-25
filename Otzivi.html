@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Отзиви от клиенти — NoGrey</title>
+<meta name="description" content="Мнения и снимки от клиенти, използвали оцветяващите шампоани и серуми NoGrey.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .rv-summary { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; margin-bottom: 26px; }
+  .rv-avg { font-family: var(--serif); font-size: 3.2rem; line-height: 1; color: var(--green-ink); font-weight: 700; }
+  .rv-avg-stars { font-size: 1.25rem; }
+  .rv-bars { flex: 1; min-width: 220px; max-width: 360px; display: grid; gap: 4px; font-size: .85rem; }
+  .rv-bar { display: grid; grid-template-columns: 34px 1fr 28px; gap: 8px; align-items: center; color: var(--muted); }
+  .rv-bar span.track { height: 8px; background: var(--sage); border-radius: 999px; overflow: hidden; }
+  .rv-bar span.fill { display: block; height: 100%; background: #c9932b; border-radius: 999px; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+
+<section class="section" style="padding-top:44px">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Отзиви</div>
+      <h1 style="font-size:clamp(1.9rem,4vw,2.6rem)">Какво казват клиентите</h1>
+    </div>
+    <div id="rv-summary"></div>
+    <div class="filters" id="rv-filters" hidden>
+      <button class="chip active" data-f="all">Всички</button>
+      <button class="chip" data-f="photos">Със снимки</button>
+      <button class="chip" data-f="5">5 ★</button>
+      <button class="chip" data-f="4">4 ★</button>
+      <button class="chip" data-f="low">3 ★ и по-малко</button>
+    </div>
+    <div class="reviews-grid" id="rv-grid"><div class="spinner" style="grid-column:1/-1"></div></div>
+    <div style="text-align:center;margin-top:28px"><button class="btn ghost" id="rv-more" style="display:none">Покажи още</button></div>
+  </div>
+</section>
+
+<div id="site-footer"></div>
+<script src="assets/config.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(async function () {
+  const store = await initPage('reviews');
+  const all = await loadAllReviews(store.settings);
+  const grid = document.getElementById('rv-grid');
+  const PAGE = 12;
+  let filter = 'all', shown = PAGE;
+
+  if (!all.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">Все още няма отзиви. <a href="products.html">Разгледай продуктите</a></div>';
+    return;
+  }
+
+  // Обобщение: средна оценка + разпределение по звезди
+  const avg = all.reduce((a, r) => a + r.rating, 0) / all.length;
+  const counts = [5, 4, 3, 2, 1].map(n => all.filter(r => r.rating === n).length);
+  document.getElementById('rv-summary').innerHTML = `
+    <div class="rv-summary">
+      <div>
+        <div class="rv-avg">${avg.toFixed(1).replace('.', ',')}</div>
+        <div class="stars rv-avg-stars">${starStr(Math.round(avg))}</div>
+        <div class="muted" style="font-size:.9rem">${all.length} ${all.length === 1 ? 'отзив' : 'отзива'}</div>
+      </div>
+      <div class="rv-bars">${[5, 4, 3, 2, 1].map((n, i) => `
+        <div class="rv-bar"><span>${n} ★</span><span class="track"><span class="fill" style="width:${Math.round(counts[i] / all.length * 100)}%"></span></span><span>${counts[i]}</span></div>`).join('')}
+      </div>
+    </div>`;
+
+  const filters = document.getElementById('rv-filters');
+  filters.hidden = false;
+  if (!all.some(r => (r.photos || []).length)) filters.querySelector('[data-f=photos]').hidden = true;
+  filters.querySelectorAll('[data-f="5"],[data-f="4"],[data-f=low]').forEach(b => {
+    const n = b.dataset.f;
+    if (!all.some(r => n === 'low' ? r.rating <= 3 : r.rating === Number(n))) b.hidden = true;
+  });
+
+  function list() {
+    if (filter === 'photos') return all.filter(r => (r.photos || []).length);
+    if (filter === 'low') return all.filter(r => r.rating <= 3);
+    if (filter !== 'all') return all.filter(r => r.rating === Number(filter));
+    return all;
+  }
+  function render() {
+    const l = list();
+    grid.innerHTML = l.slice(0, shown).map(reviewCard).join('') || '<div class="empty-state" style="grid-column:1/-1">Няма отзиви по този филтър.</div>';
+    document.getElementById('rv-more').style.display = l.length > shown ? '' : 'none';
+  }
+  filters.addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    filter = b.dataset.f; shown = PAGE;
+    filters.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x === b));
+    render();
+  });
+  document.getElementById('rv-more').onclick = () => { shown += PAGE; render(); };
+  render();
+})();
+</script>
+</body>
+</html>
