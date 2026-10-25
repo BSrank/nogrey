@@ -97,7 +97,15 @@
     "freeShippingThreshold": 0,
     "showManualReviews": true,
     "showClientReviews": true,
-    "manualReviews": [],
+    "manualReviews": [
+      {
+        "text": "Стахотен продукт, неочаквах точно такъв резултат, благодаря ви",
+        "author": "",
+        "courier": "",
+        "rating": 5,
+        "photos": []
+      }
+    ],
     "rewardDiscountChance": 0,
     "rewardDiscountPercent": 10,
     "faq": [
