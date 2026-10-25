@@ -148,6 +148,7 @@
         <button class="chip" data-group="how">Как действа</button>
         <button class="chip" data-group="choose">Кое да избера</button>
         <button class="chip" data-group="faq">Въпроси</button>
+        <button class="chip" data-group="cancel">Откази</button>
         <button class="chip" data-group="terms">Условия</button>
         <button class="chip" data-group="reviews">Ревюта и награди</button>
         <button class="chip" data-group="password">Парола</button>
@@ -251,6 +252,15 @@
         </div>
       </div>
 
+      <!-- Откази -->
+      <div class="set-group" data-group="cancel" hidden>
+        <div class="card">
+          <div class="toolbar" style="margin-bottom:6px"><h3 style="margin:0 auto 0 0">Готови причини за отказ</h3><button class="btn ghost sm" onclick="addReason()">+ Добави причина</button></div>
+          <p class="muted" style="font-size:.86rem;margin-top:0">Избираш ги при „Откажи…“ / „Без отговор…“ в Поръчки. Текстът отива в имейла до клиента — можеш да го промениш и за конкретната поръчка. Заместители: <b>{име}</b>, <b>{телефон}</b>, <b>{поръчка}</b>.</p>
+          <div id="reasons-edit"></div>
+        </div>
+      </div>
+
       <!-- Условия -->
       <div class="set-group" data-group="terms" hidden>
         <div class="card" style="margin-bottom:18px">
@@ -305,6 +315,9 @@
     </section>
   </div>
 </div>
+
+<!-- Отказ на поръчка -->
+<div class="modal-bg" id="cancel-modal"><div class="modal" id="cancel-body" style="max-width:600px"></div></div>
 
 <!-- Редактор на продукт -->
 <div class="modal-bg" id="modal"><div class="modal" id="modal-body"></div></div>
@@ -850,14 +863,14 @@ function renderOrders() {
       const id = esc(o['OrderID']);
       return `<tr>
         <td><b>${id}</b><br><span class="muted">${esc(o['Дата'])}</span></td>
-        <td><span class="st ${stClass(o['Статус'])}">${esc(o['Статус'])}</span>${o['Некоректен'] ? `<br><small>${esc(o['Некоректен'])}</small>` : ''}</td>
+        <td><span class="st ${stClass(o['Статус'])}">${esc(o['Статус'])}</span>${o['Некоректен'] ? `<br><small>${esc(o['Некоректен'])}</small>` : ''}${o['Причина за отказ'] ? `<br><small class="muted" title="${esc(o['Причина за отказ'])}">„${esc(String(o['Причина за отказ']).slice(0, 60))}${String(o['Причина за отказ']).length > 60 ? '…' : ''}“</small>` : ''}</td>
         <td>${esc(o['Име'])}<br><a href="tel:${esc(o['Телефон'])}">${esc(o['Телефон'])}</a>${o['Имейл'] ? `<br><small>${esc(o['Имейл'])}</small>` : ''}</td>
         <td>${esc(o['Куриер'])}<br>${esc(o['Град'])}<br><small>${esc(o['Офис'])}</small>${o['Бележка'] ? `<br><small><i>${esc(o['Бележка'])}</i></small>` : ''}</td>
         <td style="min-width:180px">${esc(o['Продукти']).replace(/\n/g, '<br>')}${o['Промо код'] ? `<br><small>Код: ${esc(o['Промо код'])}${o['Отстъпка %'] ? ' (−' + esc(o['Отстъпка %']) + '%)' : ''}</small>` : ''}</td>
         <td style="white-space:nowrap"><b>${esc(o['Общо EUR'])} €</b><br><small>${esc(o['Общо BGN'])} лв.</small></td>
         <td><div class="acts">
-          ${o['Статус'] === 'Нова' ? `<button class="btn ghost sm" onclick="orderAction('adminCancelOrder','${id}','Да откажа ли поръчката? Клиентът ще получи имейл.')">Откажи</button>
-          <button class="btn ghost sm" onclick="orderAction('adminNoAnswer','${id}','Да маркирам „Без отговор“ (без имейл)?')">Без отговор</button>` : ''}
+          ${o['Статус'] === 'Нова' ? `<button class="btn ghost sm" onclick="openCancelDialog('${id}','cancel')">Откажи…</button>
+          <button class="btn ghost sm" onclick="openCancelDialog('${id}','noanswer')">Без отговор…</button>` : ''}
           ${o['Имейл'] ? `<button class="btn ghost sm" onclick="orderAction('adminSendReviewInvite','${id}','Да изпратя покана за ревю?')">${o['Покана за ревю'] ? 'Покана отново' : 'Покана за ревю'}</button>` : ''}
           <button class="btn danger ghost sm" onclick="orderAction('adminDeleteOrder','${id}','Изтриване завинаги от Sheet-а?')">Изтрий</button>
         </div></td>
@@ -947,6 +960,8 @@ function fillSettings() {
   document.getElementById('terms-updated').value = terms.updated;
   TERMS = JSON.parse(JSON.stringify(terms.sections));
   toggleSeller(); // рисува и точките
+  REASONS = JSON.parse(JSON.stringify(getReasons()));
+  renderReasons();
   FAQ = JSON.parse(JSON.stringify(getFaq(s)));
   renderFaq();
   renderHeroPreview();
@@ -1228,6 +1243,108 @@ function resetTerms() {
   TERMS = JSON.parse(JSON.stringify(DEFAULT_TERMS.sections)); renderTerms();
 }
 
+/* ======= Причини за отказ (settings.cancelReasons) ======= */
+const DEFAULT_CANCEL_REASONS = [
+  { label: 'Не успяхме да се свържем', text: 'Опитахме да се свържем с вас на телефон {телефон}, за да потвърдим поръчката, но не успяхме. Затова я анулирахме.\nАко все още желаете продуктите, просто направете нова поръчка или отговорете на този имейл — ще се радваме да ви ги изпратим.' },
+  { label: 'Продуктът не е наличен', text: 'За съжаление продуктът от поръчката ви в момента не е наличен. Извиняваме се за неудобството!\nЩе се радваме да поръчате отново, когато е наличен.' },
+  { label: 'Дублирана поръчка', text: 'Получихме от вас няколко еднакви поръчки, затова анулирахме тази. Другата ви поръчка е активна и ще бъде изпратена.' }
+];
+function getReasons() { return Array.isArray(DATA.settings.cancelReasons) ? DATA.settings.cancelReasons : DEFAULT_CANCEL_REASONS; }
+let REASONS = [];
+function renderReasons() {
+  const box = document.getElementById('reasons-edit');
+  box.innerHTML = REASONS.length ? REASONS.map((x, i) => `
+    <div class="sec-block">
+      <input placeholder="Кратко име (виждаш го само ти)" value="${esc(x.label)}" oninput="REASONS[${i}].label=this.value" style="margin-bottom:8px;font-weight:700">
+      <textarea rows="3" placeholder="Текст към клиента" oninput="REASONS[${i}].text=this.value">${esc(x.text)}</textarea>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" class="btn ghost sm" onclick="moveReason(${i},-1)" ${i === 0 ? 'disabled' : ''} title="Нагоре">↑</button>
+        <button type="button" class="btn ghost sm" onclick="moveReason(${i},1)" ${i === REASONS.length - 1 ? 'disabled' : ''} title="Надолу">↓</button>
+        <button type="button" class="btn danger ghost sm" onclick="REASONS.splice(${i},1);renderReasons()">Махни</button>
+      </div>
+    </div>`).join('') : '<p class="muted">Няма готови причини — при отказ ще пишеш своя.</p>';
+}
+function addReason() { REASONS.push({ label: '', text: '' }); renderReasons(); }
+function moveReason(i, d) {
+  const j = i + d; if (j < 0 || j >= REASONS.length) return;
+  [REASONS[i], REASONS[j]] = [REASONS[j], REASONS[i]]; renderReasons();
+}
+
+/* ======= Прозорец за отказ на поръчка ======= */
+let CANCEL = null; // { orderId, mode, order }
+function openCancelDialog(orderId, mode) {
+  const o = ORDERS.find(x => String(x['OrderID']) === String(orderId));
+  if (!o) return;
+  const reasons = getReasons();
+  const hasEmail = !!o['Имейл'];
+  // „Без отговор“ започва с първата причина (по подразбиране „Не успяхме да се свържем“)
+  const pre = reasons.length ? 0 : -1;
+  CANCEL = { orderId, mode, order: o };
+  const title = mode === 'noanswer' ? 'Без отговор' : 'Отказ на поръчка';
+  document.getElementById('cancel-body').innerHTML = `
+    <div class="toolbar"><h2 style="font-size:1.4rem">${title} · ${esc(orderId)}</h2><button class="btn ghost sm" onclick="closeCancelDialog()">Затвори</button></div>
+    <p class="muted" style="margin-top:-8px">${esc(o['Име'])} · ${esc(o['Телефон'])}${hasEmail ? ' · ' + esc(o['Имейл']) : ''}</p>
+    <div class="field">
+      <label>Причина</label>
+      <div class="filters" id="cx-reasons" style="margin-bottom:10px">
+        ${reasons.map((r, i) => `<button type="button" class="chip ${i === pre && mode === 'noanswer' ? 'active' : ''}" data-i="${i}">${esc(r.label || 'Причина ' + (i + 1))}</button>`).join('')}
+        <button type="button" class="chip" data-i="custom">✎ Своя причина</button>
+        <button type="button" class="chip ${mode !== 'noanswer' ? 'active' : ''}" data-i="none">Без причина</button>
+      </div>
+      <textarea id="cx-text" rows="5" placeholder="Напиши причината към клиента…"></textarea>
+      <small>Можеш да редактираш текста свободно. {име}, {телефон} и {поръчка} се заместват автоматично.</small>
+    </div>
+    <div class="field">
+      <label class="switch"><input type="checkbox" id="cx-notify" ${hasEmail ? '' : 'disabled'}> Изпрати имейл на клиента с причината</label>
+      ${hasEmail ? '' : '<small style="color:var(--warn)">Клиентът не е оставил имейл — няма как да му се изпрати съобщение. Обади се или пиши по телефона.</small>'}
+    </div>
+    <div class="notice" style="margin-bottom:16px;font-size:.88rem">Статус след потвърждение: <b>${mode === 'noanswer' ? 'Без отговор' : 'Отказана'}</b>. Ако клиентът е ползвал промо код, кодът става отново валиден.</div>
+    <div id="cx-status"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" id="cx-go" style="${mode === 'noanswer' ? '' : 'background:var(--danger);border-color:var(--danger)'}" onclick="confirmCancel()">Потвърди</button>
+      <button class="btn ghost" onclick="closeCancelDialog()">Назад</button>
+    </div>`;
+  const text = document.getElementById('cx-text');
+  const notify = document.getElementById('cx-notify');
+  const pick = key => {
+    document.querySelectorAll('#cx-reasons .chip').forEach(c => c.classList.toggle('active', c.dataset.i === String(key)));
+    if (key === 'none') { text.value = ''; text.disabled = true; notify.checked = false; }
+    else {
+      text.disabled = false;
+      text.value = key === 'custom' ? '' : (reasons[key].text || '');
+      if (hasEmail) notify.checked = true;
+      if (key === 'custom') text.focus();
+    }
+  };
+  document.getElementById('cx-reasons').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    pick(c.dataset.i === 'custom' || c.dataset.i === 'none' ? c.dataset.i : Number(c.dataset.i));
+  });
+  pick(mode === 'noanswer' && pre === 0 ? 0 : 'none');
+  document.getElementById('cancel-modal').classList.add('open');
+}
+function closeCancelDialog() { document.getElementById('cancel-modal').classList.remove('open'); CANCEL = null; }
+async function confirmCancel() {
+  if (!CANCEL) return;
+  const text = document.getElementById('cx-text');
+  const reason = text.disabled ? '' : text.value.trim();
+  const notify = document.getElementById('cx-notify').checked;
+  const st = document.getElementById('cx-status');
+  if (notify && !reason) { st.innerHTML = '<div class="notice error" style="margin-bottom:12px">Напиши причина или изключи имейла.</div>'; return; }
+  const btn = document.getElementById('cx-go'); btn.disabled = true; btn.textContent = 'Изпращане…';
+  try {
+    const r = await adminCall(CANCEL.mode === 'noanswer' ? 'adminNoAnswer' : 'adminCancelOrder', { orderId: CANCEL.orderId, reason, notify });
+    if (!r.ok) throw new Error(r.error || 'Грешка');
+    closeCancelDialog();
+    toast(r.mailed ? 'Готово — клиентът получи имейл' : 'Готово');
+    loadOrders();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Потвърди';
+    st.innerHTML = `<div class="notice error" style="margin-bottom:12px">${esc(e.message)}</div>`;
+  }
+}
+document.getElementById('cancel-modal').addEventListener('click', e => { if (e.target.id === 'cancel-modal') closeCancelDialog(); });
+
 /* ======= Често задавани въпроси ======= */
 let FAQ = [];
 function renderFaq() {
@@ -1273,6 +1390,7 @@ function saveSettings() {
     updated: document.getElementById('terms-updated').value.trim(),
     sections: TERMS.map(x => ({ title: (x.title || '').trim(), body: (x.body || '').trim() })).filter(x => x.title || x.body)
   };
+  s.cancelReasons = REASONS.map(x => ({ label: (x.label || '').trim(), text: (x.text || '').trim() })).filter(x => x.label || x.text);
   s.faq = FAQ.map(x => ({ q: (x.q || '').trim(), a: (x.a || '').trim() })).filter(x => x.q);
   s.benefits = BENEFITS.map(b => ({ title: (b.title || '').trim(), text: (b.text || '').trim() })).filter(b => b.title || b.text);
   S_TEXT.forEach(k => s[k] = document.getElementById('s-' + k).value.trim());
