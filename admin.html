@@ -163,6 +163,11 @@
           <div class="field"><label>Лента с обявление (най-горе)</label><input id="s-announcement"></div>
           <div class="field"><label>Безплатна доставка над (€, 0 = изключено)</label><input id="s-freeShippingThreshold" type="number" min="0" step="1"></div>
         </div>
+        <div class="card" style="grid-column:1/-1">
+          <h3>Бекенд (Google Apps Script)</h3>
+          <div class="field"><label>Web app URL</label><input id="s-webAppUrl" placeholder="https://script.google.com/macros/s/…/exec" spellcheck="false"><small>От Apps Script → Deploy → Manage deployments → Web app URL (завършва на <code>/exec</code>). Нужен е за поръчки, ревюта и контакт формата.</small></div>
+          <div id="webapp-status"></div>
+        </div>
         <div>
           <div class="card" style="margin-bottom:18px">
             <h3>Контакт</h3>
@@ -304,6 +309,7 @@
 <!-- Редактор на продукт -->
 <div class="modal-bg" id="modal"><div class="modal" id="modal-body"></div></div>
 
+<script src="assets/config.js"></script>
 <script src="assets/cart.js"></script>
 <script src="assets/terms-default.js"></script>
 <script>
@@ -397,6 +403,7 @@ async function loadData() {
   DATA.products = DATA.products || [];
   DATA.settings = Object.assign({}, DEFAULT_DATA.settings, DATA.settings || {});
   DATA.urgency = Object.assign({ enabled: false, items: {} }, DATA.urgency || {});
+  applyWebAppUrl(DATA.settings.webAppUrl);
   if (!f) setSaveState('products.json липсва в repo-то — натисни „Запази products.json“');
 }
 
@@ -823,7 +830,7 @@ async function submitProduct(e) {
 function stClass(s) { return s === 'Нова' ? 'st-new' : s === 'Отказана' ? 'st-cancel' : 'st-noans'; }
 async function loadOrders() {
   const box = document.getElementById('orders-box');
-  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен webAppUrl в assets/config.js.</div>'; return; }
+  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен адрес на бекенда. Постави го в <b>Настройки → Общи → Бекенд</b> и натисни „Запази настройките“.</div>'; return; }
   box.innerHTML = '<div class="spinner"></div>';
   try {
     const r = await withRetry(() => adminCall('adminGetOrders'));
@@ -870,7 +877,7 @@ async function orderAction(action, orderId, question) {
 /* ======= Ревюта ======= */
 async function loadReviews() {
   const box = document.getElementById('reviews-box');
-  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен webAppUrl в assets/config.js.</div>'; return; }
+  if (!scriptReady()) { box.innerHTML = '<div class="notice error">Не е зададен адрес на бекенда. Постави го в <b>Настройки → Общи → Бекенд</b> и натисни „Запази настройките“.</div>'; return; }
   box.innerHTML = '<div class="spinner"></div>';
   try {
     const r = await withRetry(() => adminCall('adminGetReviews'));
@@ -912,6 +919,8 @@ const S_BOOL = ['showNewListings', 'showManualReviews', 'showClientReviews'];
 let MANUAL = [];
 function fillSettings() {
   const s = DATA.settings;
+  // показва текущия адрес (от настройките или от config.js), за да е лесно да се запази
+  document.getElementById('s-webAppUrl').value = s.webAppUrl || GOOGLE_SHEETS_CONFIG.webAppUrl || '';
   S_TEXT.forEach(k => document.getElementById('s-' + k).value = s[k] || '');
   S_NUM.forEach(k => document.getElementById('s-' + k).value = s[k] ?? '');
   S_BOOL.forEach(k => document.getElementById('s-' + k).checked = s[k] !== false);
@@ -1174,6 +1183,14 @@ function moveFaq(i, d) {
 
 function saveSettings() {
   const s = DATA.settings;
+  const wa = document.getElementById('s-webAppUrl').value.trim();
+  if (wa && !WEBAPP_RE.test(wa)) { showSetGroup('general'); document.getElementById('webapp-status').innerHTML = '<div class="notice error">URL-ът трябва да започва с https://script.google.com/ и да завършва на /exec.</div>'; return; }
+  if (wa && /\/dev\/?$/.test(wa)) { showSetGroup('general'); document.getElementById('webapp-status').innerHTML = '<div class="notice error">Това е тестов URL (/dev). Вземи този от Deploy → Manage deployments, който завършва на /exec.</div>'; return; }
+  document.getElementById('webapp-status').innerHTML = '';
+  s.webAppUrl = wa;
+  applyWebAppUrl(wa);
+  if (!wa) GOOGLE_SHEETS_CONFIG.webAppUrl = String((window.NOGREY_CONFIG && window.NOGREY_CONFIG.webAppUrl) || '').trim();
+  ORDERS = [];
   s.how = { steps: STEPS.map(x => ({ title: (x.title || '').trim(), text: (x.text || '').trim() })).filter(x => x.title || x.text) };
   HOW_FIELDS.forEach(k => { s.how[k] = document.getElementById('how-' + k).value.trim(); });
   s.choose = {
