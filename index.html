@@ -97,6 +97,7 @@
       <h2>Какво казват клиентите</h2>
     </div>
     <div class="reviews-grid" id="reviews-grid"></div>
+    <div style="text-align:center;margin-top:28px" id="reviews-more" hidden><a class="btn ghost" href="otzivi.html">Виж всички отзиви</a></div>
   </div>
 </section>
 
@@ -177,21 +178,18 @@
     ? featured.map(productCard).join('')
     : '<div class="empty-state" style="grid-column:1/-1">Продуктите идват скоро.</div>';
 
-  // Ревюта: ръчни (от products.json) + одобрени клиентски (от Google Sheet)
+  // Ревюта: първите 6 тук, всички — на otzivi.html
   const grid = document.getElementById('reviews-grid');
-  let reviews = [];
-  if (s.showManualReviews !== false) reviews = reviews.concat((s.manualReviews || []).map(r => ({ ...r, rating: r.rating || 5, photos: r.photos || [] })));
-  grid.innerHTML = reviews.map(reviewCard).join('');
-  if (s.showClientReviews !== false && scriptReady()) {
-    try {
-      const res = await apiGet({ action: 'getReviews' });
-      if (res && res.ok) {
-        reviews = reviews.concat(res.reviews.map(r => ({ text: r.text, author: r.name, rating: r.rating, verified: true, photos: (r.photos || []).map(id => driveImg(id)) })));
-        grid.innerHTML = reviews.map(reviewCard).join('');
-      }
-    } catch (e) {}
-  }
-  if (!reviews.length) document.getElementById('reviews').style.display = 'none';
+  const HOME_REVIEWS = 6;
+  const manualFirst = (s.showManualReviews !== false ? (s.manualReviews || []) : []).filter(r => r && r.text);
+  grid.innerHTML = manualFirst.slice(0, HOME_REVIEWS).map(r => reviewCard({ ...r, rating: Number(r.rating) || 5 })).join(''); // показваме веднага, без да чакаме Google
+  const reviews = await loadAllReviews(s);
+  if (reviews.length) {
+    grid.innerHTML = reviews.slice(0, HOME_REVIEWS).map(reviewCard).join('');
+    const more = document.getElementById('reviews-more');
+    more.hidden = false;
+    more.querySelector('a').textContent = `Виж всички отзиви (${reviews.length}) →`;
+  } else document.getElementById('reviews').style.display = 'none';
 
   // Контакт: форма или телефон
   const box = document.getElementById('contact-box');
