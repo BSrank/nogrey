@@ -58,6 +58,7 @@ async function loadStore() {
   STORE.products = (STORE.products || []);
   STORE.settings = STORE.settings || {};
   STORE.urgency = STORE.urgency || {};
+  applyWebAppUrl(STORE.settings.webAppUrl);
   return STORE;
 }
 function activeProducts() { return (STORE.products || []).filter(p => p.active !== false); }
@@ -103,7 +104,13 @@ function imgTag(src, alt, cls) {
 }
 
 /* ---------- Apps Script ---------- */
-function scriptReady() { return /^https:\/\/script\.google(usercontent)?\.com\/.+/.test(GOOGLE_SHEETS_CONFIG.webAppUrl); }
+const WEBAPP_RE = /^https:\/\/script\.google(usercontent)?\.com\/.+/;
+// URL от Админ → Настройки (products.json) има предимство пред assets/config.js
+function applyWebAppUrl(u) {
+  u = String(u || '').trim();
+  if (WEBAPP_RE.test(u)) GOOGLE_SHEETS_CONFIG.webAppUrl = u;
+}
+function scriptReady() { return WEBAPP_RE.test(GOOGLE_SHEETS_CONFIG.webAppUrl); }
 async function apiGet(params) {
   if (!scriptReady()) throw new Error('Бекендът още не е свързан (webAppUrl в assets/config.js).');
   const url = GOOGLE_SHEETS_CONFIG.webAppUrl + '?' + new URLSearchParams(params).toString();
